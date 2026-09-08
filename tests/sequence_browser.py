@@ -24,11 +24,13 @@ with sync_playwright() as pw:
   return page
  page=newpage();errors=[];pickers=[];downloads=[];requests=[];deferred=[];mode={'value':'ok'}
  page.on('pageerror',lambda e:errors.append(str(e)));page.on('filechooser',lambda e:pickers.append(True));page.on('download',lambda d:downloads.append(d.suggested_filename))
+ def fixture_headers(route,sid):
+  return {'Content-Type':'application/octet-stream','X-Sequence-Id':sid,'Access-Control-Allow-Origin':route.request.headers.get('origin',''),'Access-Control-Expose-Headers':'X-Sequence-Id'}
  def routehandler(route):
   requests.append(route.request.url);sid=urllib.parse.parse_qs(urllib.parse.urlsplit(route.request.url).query)['id'][0]
   if mode['value']=='defer':deferred.append((route,sid));return
-  if mode['value']=='fail':route.fulfill(status=502,content_type='application/json',body='{"error":"unavailable"}');return
-  route.fulfill(status=200,headers={'Content-Type':'application/octet-stream','X-Sequence-Id':sid},body=fixture)
+  if mode['value']=='fail':route.fulfill(status=502,headers=fixture_headers(route,sid),body='{"error":"unavailable"}');return
+  route.fulfill(status=200,headers=fixture_headers(route,sid),body=fixture)
  page.route(ENDPOINT+'*',routehandler)
  try:
   page.goto(f'http://127.0.0.1:{server.server_port}/index.html',timeout=15000)
@@ -54,18 +56,21 @@ with sync_playwright() as pw:
   mode['value']='defer';page.locator('.edition-play').nth(2).click();page.wait_for_function('JSSCCEditionUI.diagnostics().remoteLoading!==null')
   page.wait_for_timeout(100);page.click('#edition-cancel-load');page.wait_for_function('JSSCCEditionUI.diagnostics().remoteLoading===null')
   for route,sid in deferred:
-   try:route.fulfill(status=200,headers={'Content-Type':'application/octet-stream','X-Sequence-Id':sid},body=fixture)
+   try:route.fulfill(status=200,headers=fixture_headers(route,sid),body=fixture)
    except Exception:pass
   deferred.clear();page.wait_for_timeout(150)
   check('late response after cancel cannot replace or autoplay a song',page.evaluate('JSSCCMidi.current.fileName')==old and page.evaluate('JSSCCMidi.diagnostics().state==="stopped"'))
   page.locator('.edition-play').nth(3).click();page.wait_for_timeout(100);page.keyboard.press('Escape');page.wait_for_timeout(100)
   for route,sid in deferred:
-   try:route.fulfill(status=200,headers={'Content-Type':'application/octet-stream','X-Sequence-Id':sid},body=fixture)
+   try:route.fulfill(status=200,headers=fixture_headers(route,sid),body=fixture)
    except Exception:pass
   deferred.clear();check('closing the drawer cancels pending auto-play',page.evaluate('JSSCCEditionUI.diagnostics().remoteLoading===null && JSSCCMidi.diagnostics().state==="stopped"'))
   check('no sequence bytes are written to localStorage',page.evaluate('localStorage.length===0'))
   page.click('#jsscc-sequencer');page.wait_for_timeout(180);page.screenshot(path=str(OUT/'sequence-direct-play.png'),full_page=True)
   check('no browser exceptions in automatic import flow',not errors,errors)
+ except Exception:
+  (OUT/'sequence-fixture-failure.json').write_text(json.dumps({'errors':errors,'requests':requests,'pickers':pickers,'downloads':downloads,'feedback':page.locator('#edition-feedback').inner_text(),'player':page.evaluate('window.JSSCCMidi?.diagnostics()'),'library':page.evaluate('window.JSSCCEditionUI?.diagnostics()')},indent=2))
+  page.screenshot(path=str(OUT/'sequence-fixture-failure.png'),full_page=True);raise
  finally:page.close()
  if os.environ.get('LIVE_SEQUENCE_SMOKE')=='1':
   live=newpage();liveErrors=[];livePickers=[];liveDownloads=[];statuses=[]
