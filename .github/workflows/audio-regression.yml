@@ -1,0 +1,33 @@
+name: Audio regression checks
+on:
+  push:
+    branches: [github-pages, fix/audit-20260908]
+  pull_request:
+    branches: [github-pages]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Save exact source under test
+        run: git archive --format=zip HEAD > audit-source.zip
+      - name: Validate data adapter syntax
+        run: node --check js/gxscc-exact-data.js
+      - name: Run regression suite when present
+        run: |
+          if test -f tests/regressions.cjs; then
+            node --test tests/regressions.cjs
+          fi
+      - name: Preserve source for browser reproduction
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-source
+          path: audit-source.zip
+          retention-days: 7
