@@ -1,0 +1,74 @@
+{
+  "provenance": {
+    "nativeExeSha256": "1eeeecf6ff72f34841983e05579114159748c70d0b3725d85af3301004992f7a",
+    "run": 34249333054,
+    "artifact": 10065505132,
+    "artifactSha256": "dd6ecad8da1998d980bf5795eaa30dda4d6a2e30297adf990a670f88bd2bc25e"
+  },
+  "scope": "Prefix only: first <=10000 stereo PCM16 frames after first absolute sample >3, note60 velocity100 default CC7=100, CC11=127, pan64, no normalization. Non-deterministic/state-dependent programs excluded from equality assertions. Not whole-file or perceptual equivalence.",
+  "excludedPrograms": [
+    122,
+    123,
+    126,
+    127
+  ],
+  "framesPerPrefix": 10000,
+  "banks": [
+    {
+      "bank": 0,
+      "concatenatedSha256": "dc5cd388704168cb6283aa06d66241155cd2702029d11e9fe96be004018f0856",
+      "lengthOverrides": {
+        "118": 1728
+      }
+    },
+    {
+      "bank": 1,
+      "concatenatedSha256": "90f9f6b5c0d2ed7534e837ced3fac0a056179c9a4b3a3cc0d7fc8fe65a711140",
+      "lengthOverrides": {
+        "118": 1728
+      }
+    },
+    {
+      "bank": 2,
+      "concatenatedSha256": "1ade84237baae82fd646206f3843c8b05756765696e0cba732bc0c2e48b61c52",
+      "lengthOverrides": {
+        "118": 1733
+      }
+    },
+    {
+      "bank": 3,
+      "concatenatedSha256": "32427ceb0ca94846a08a5217e8e0f40c170237ffcf03ed60f4f0fab55841b9ef",
+      "lengthOverrides": {
+        "118": 1728
+      }
+    },
+    {
+      "bank": 4,
+      "concatenatedSha256": "bc56423354573e313be27d57e0460686624fe584d10298bcc8f81e8c876596ec",
+      "lengthOverrides": {
+        "118": 1716
+      }
+    },
+    {
+      "bank": 5,
+      "concatenatedSha256": "c51996349a4b2467f1d455ca43654a45570f5b124e775ec1d60a80faed8da105",
+      "lengthOverrides": {
+        "118": 1728
+      }
+    },
+    {
+      "bank": 6,
+      "concatenatedSha256": "6f919716d1270be2c5928e4246335f5e34c286dbdaaf6df9eb30de087f1f1ca7",
+      "lengthOverrides": {
+        "118": 1728
+      }
+    },
+    {
+      "bank": 7,
+      "concatenatedSha256": "639728914b72d7407c9b414f77d3ba2933377625c55ed456ded8d59be20d8bff",
+      "lengthOverrides": {
+        "118": 1594
+      }
+    }
+  ]
+}

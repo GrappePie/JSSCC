@@ -87,7 +87,7 @@
           need(length);
           push({tick, type: 'sysex', data: Array.from(bytes.subarray(p, p + length)), status, port});
           p += length;
-          warnings.add('SysEx is preserved, but is not interpreted by this engine');
+          warnings.add('SysEx is preserved; support depends on the selected audio engine');
           continue;
         }
         if (status >= 240) throw new Error('Unsupported MIDI system status ' + status);
@@ -129,7 +129,7 @@
     const duration = toSeconds(maximumTick);
     if (!Number.isFinite(duration) || duration > 21600) throw new Error('MIDI duration exceeds six hours');
     return {format, trackCount: numberOfTracks, ppq: ticksPerSecond ? null : division,
-      division, duration, events, warnings: [...warnings], fileName};
+      division, duration, events, tempoEvents: tempos.filter(t => t.order >= 0).map(t => ({...t})), maximumTick, warnings: [...warnings], fileName};
   }
   root.JSSCCParser = {parseMidi};
   if (typeof module !== 'undefined' && module.exports) module.exports = root.JSSCCParser;
