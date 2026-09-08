@@ -1,10 +1,11 @@
 /* Experimental B236E-data synthesizer, not a sample-identical GXSCC emulator.
- * Oscillator reconstruction, ADSR curves, mixer and all percussion remain hypotheses.
+ * Linear envelope stages and standard PSG recipes are traced to the B236E EXE.
+ * Oscillator reconstruction, noise stream, mixer and timing are not bit-identical.
  * The same Synth is used for interactive playback and offline WAV rendering.
  */
 (function (root) {
   'use strict';
-  const VERSION = 'audit-fix-20260908.1';
+  const VERSION = 'reference-fix-20260908.2';
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const frequency = note => 440 * Math.pow(2, (note - 69) / 12);
   const defaults = () => ({program: 0, volume: 100 / 127, expression: 1, pan: 0,
@@ -26,7 +27,7 @@
   }
 
   class Synth {
-    constructor(context, data, {instrumentSet = 0, masterGain = 0.12} = {}) {
+    constructor(context, data, {instrumentSet = 0, masterGain = 0.25} = {}) {
       if (!context || !data || data.envelopes.length !== 128) throw new Error('Synth data/context missing');
       this.context = context; this.data = data; this.instrumentSet = instrumentSet;
       this.master = context.createGain(); this.master.gain.value = masterGain;
@@ -54,7 +55,9 @@
     }
     envelope(program) {
       const v = this.data.envelopes[program & 127], rate = this.data.referenceSampleRate;
-      return {a: v.a / rate, d: v.d / rate, s: clamp(v.s / 65535, 0, 1), r: v.r / rate};
+      // B236E: offset +0x0c is held-key decay, +0x10 is Note Off release.
+      return {a: v.a / rate, d: v.d / rate, s: clamp(v.s / 65535, 0, 1),
+        tail: v.r / rate, r: v.x / rate};
     }
     active(time = this.context.currentTime) {
       return this.voices.filter(v => v.start <= time && v.end > time);
@@ -76,28 +79,32 @@
     }
     amplitudeAt(v, time) {
       const age = Math.max(0, time - v.start), e = v.env;
+      if (v.releaseTime !== null && time >= v.releaseTime && v.releaseLevel !== undefined) {
+        return v.releaseLevel * Math.max(0, 1 - (time - v.releaseTime) / Math.max(1e-12, v.end - v.releaseTime));
+      }
       if (e.a > 0 && age < e.a) return v.peak * age / e.a;
-      if (e.d > 0 && age < e.a + e.d) return v.peak * Math.pow(Math.max(1e-5, e.s), (age - e.a) / e.d);
-      return v.peak * e.s;
+      if (e.d > 0 && age < e.a + e.d) return v.peak * (1 - (1 - e.s) * (age - e.a) / e.d);
+      const heldLevel = e.tail > 0 ? e.s * Math.max(0, 1 - (age - e.a - e.d) / e.tail) : e.s;
+      return v.peak * heldLevel;
     }
     release(v, time, hard = false) {
       if (!v || v.end <= time || (!hard && v.releaseTime !== null)) return;
       time = Math.max(time, this.context.currentTime);
-      const param = v.gain.gain;
+      const param = v.gain.gain, value = Math.max(0, this.amplitudeAt(v, time));
       if (typeof param.cancelAndHoldAtTime === 'function') param.cancelAndHoldAtTime(time);
       else {
         param.cancelScheduledValues(time);
-        const value = Math.max(1e-6, this.amplitudeAt(v, time));
-        if (time - v.start < v.env.a) param.linearRampToValueAtTime(value, time);
-        else param.exponentialRampToValueAtTime(value, time);
+        // Preserve the truncated linear segment in browsers without cancelAndHoldAtTime.
+        param.linearRampToValueAtTime(value, time);
       }
-      v.keyDown = false; v.held = false; v.releaseTime = time;
+      // Essential even after cancelAndHold: a later ramp must start at Note Off,
+      // not at the previous attack/decay event (the offline early-fade regression).
+      param.setValueAtTime(value, time);
+      v.keyDown = false; v.held = false; v.releaseLevel = value; v.releaseTime = time;
       const duration = hard ? 0 : v.env.r;
       v.end = time + duration;
-      if (duration > 0) {
-        param.exponentialRampToValueAtTime(1e-6, v.end);
-        param.setValueAtTime(0, v.end);
-      } else param.setValueAtTime(0, time);
+      if (duration > 0) param.linearRampToValueAtTime(0, v.end);
+      else param.setValueAtTime(0, time);
       v.source.stop(v.end);
     }
     silence(time = this.context.currentTime) {
@@ -148,12 +155,18 @@
       source.frequency.setValueAtTime(frequency(e.note) * Math.pow(2, s.bend * s.bendRange / 8192 / 12), time);
       const age = snapshot ? Math.max(0, snapshot.age || 0) : 0;
       v.start = time - age;
-      gain.gain.setValueAtTime(Math.max(1e-6, this.amplitudeAt(v, time)), time);
+      gain.gain.setValueAtTime(this.amplitudeAt(v, time), time);
       if (env.a > age) gain.gain.linearRampToValueAtTime(peak, v.start + env.a);
-      if (env.a + env.d > age) gain.gain.exponentialRampToValueAtTime(Math.max(1e-6, peak * env.s), v.start + env.a + env.d);
+      if (env.a + env.d > age) gain.gain.linearRampToValueAtTime(peak * env.s, v.start + env.a + env.d);
+      if (env.tail > 0) {
+        v.end = Math.max(time, v.start + env.a + env.d + env.tail);
+        gain.gain.linearRampToValueAtTime(0, v.end);
+      }
       if (env.s === 0 && env.a + env.d <= age) gain.gain.setValueAtTime(0, time);
       source.connect(gain).connect(this.buses[e.channel].gain);
-      source.start(time); this.own(v); return v;
+      source.start(time);
+      if (Number.isFinite(v.end)) source.stop(v.end);
+      this.own(v); return v;
     }
     noteOff(channel, note, time) {
       const v = this.voices.find(x => x.channel === channel && x.note === note && x.keyDown && x.end > time);
@@ -161,46 +174,86 @@
       v.keyDown = false;
       if (this.states[channel].sustain) v.held = true; else this.release(v, time);
     }
-    noise(duration) {
-      const c = this.context, b = c.createBuffer(1, Math.ceil(c.sampleRate * duration), c.sampleRate);
-      const data = b.getChannelData(0); let lfsr = 0x7fff;
-      for (let i = 0; i < data.length; i++) {
-        lfsr = (lfsr >> 1) | (((lfsr ^ (lfsr >> 1)) & 1) << 14);
-        data[i] = lfsr & 1 ? 0.78 : -0.78;
+    drumRecipes(note) {
+      // B236E standard PSG dispatch: 0x41512c, constructors 0x4146a4..0x414cf0.
+      // [kind, reference frames, internal pitch, initial level, level/sample, cents/sample]
+      // Values are in the original 44100-Hz domain. PC50 is NOT decoded here.
+      if (note === 35 || note === 36) return [['tone', 540, 38, 1.8, -0.004, 0]];
+      if (note === 38 || note === 40) return [
+        ['noise', 1600, 140, 0.5, -0.005, 0.8],
+        ['tone', 1200, 63, 0.9, 0, -0.6]
+      ];
+      if ([42, 44, 54].includes(note)) return [['noise', 700, 150, 0.46, -0.005, 0]];
+      if (note === 46) return [['noise', 2500, 167, 0.46, -0.01, 0]];
+      if (note === 49) return [['noise', 15000, 170, 0.65, -0.005, 0]];
+      if ([41, 43, 45, 47, 48, 50].includes(note)) {
+        const pitch = note <= 43 ? 50 : note <= 47 ? 58 : 66;
+        return [['tone', 1200, pitch, 0.9, -0.005, -0.6]];
       }
-      return b;
+      if (note === 51) return [['noise', 1200, 120, 0.6, -0.005, 0]];
+      return [['noise', 500, 150, 0.3, -0.005, 0]];
     }
-    drumPart(e, time, kind, duration, level, pitch, endPitch) {
+    drumPart(e, time, recipe) {
       this.allocate(time);
-      const c = this.context, source = kind === 'noise' ? c.createBufferSource() : c.createOscillator();
-      if (kind === 'noise') source.buffer = this.noise(duration);
-      else {
-        source.type = 'square'; source.frequency.setValueAtTime(pitch, time);
-        source.frequency.exponentialRampToValueAtTime(endPitch, time + duration * 0.7);
+      const [kind, frames, pitch, level, step, cents] = recipe;
+      const c = this.context, rate = c.sampleRate, referenceRate = 44100;
+      const volume = this.states[e.channel].volume;
+      const initialLevel = Math.trunc(Math.fround(e.velocity * volume * Math.fround(level)));
+      const slope = Math.trunc(Math.fround(step) * 65536);
+      // Independent deterministic PRNG. The EXE uses a different, global MT stream.
+      // Signed remainder below is intentional: idiv at 0x401ca8 creates biased noise,
+      // not the centered +/-1 LFSR used by our previous approximation.
+      let random = (0x6d2b79f5 ^ Math.imul(++this.serial, 0x9e3779b9)) | 0;
+      let held = 0, cycleStart = 0, period = referenceRate / frequency(pitch);
+      let nextCycle = 0, stopped = false;
+      const samples = [], maximum = Math.ceil((frames + referenceRate / frequency(pitch) * 4 + 8) * rate / referenceRate);
+      for (let i = 0; i < maximum; i++) {
+        const age = i * referenceRate / rate;
+        const amplitude = Math.max(0, Math.floor((initialLevel * 65536 + slope * (age + 1)) / 65536));
+        if (age >= frames || amplitude === 0) stopped = true;
+        if (age >= nextCycle) {
+          if (stopped) break; // Native termination is applied at a cycle boundary.
+          cycleStart = nextCycle;
+          period = referenceRate / frequency(pitch + cents * age / 100);
+          nextCycle += period;
+          if (kind === 'noise') {
+            random ^= random << 13; random ^= random >>> 17; random ^= random << 5;
+            held = ((random | 0) % 65535) - 32768;
+          }
+        }
+        let value;
+        if (kind === 'noise') value = held;
+        else {
+          // Integrate a square across this output sample. The EXE instead averages
+          // a 1024-step-per-cell phase grid; this continuous integration is approximate.
+          const span = referenceRate / rate;
+          const primitive = x => {
+            const phase = (x - cycleStart) / period;
+            const f = phase - Math.floor(phase);
+            return (f <= 0.5 ? f : 1 - f) * period;
+          };
+          value = 32000 * (primitive(age + span) - primitive(age)) / span;
+        }
+        // Keep CC7/CC11 automation on the shared live bus. Initial volume participates
+        // in the native integer level; division factors it out of that bus once.
+        // 0.9 is a documented mix calibration, not a recovered original mixer.
+        samples.push(volume > 0 ? ((Math.trunc(amplitude * value) >> 7) / 32768) * 0.9 / volume : 0);
       }
-      const gain = c.createGain(), peak = e.velocity / 127 * level;
-      gain.gain.setValueAtTime(peak, time);
-      gain.gain.exponentialRampToValueAtTime(1e-6, time + duration);
+      if (!samples.length) return;
+      const buffer = c.createBuffer(1, samples.length, rate);
+      buffer.getChannelData(0).set(samples);
+      const source = c.createBufferSource(), gain = c.createGain(); source.buffer = buffer;
+      gain.gain.setValueAtTime(1, time);
       source.connect(gain).connect(this.buses[e.channel].gain);
+      const duration = samples.length / rate;
       source.start(time); source.stop(time + duration);
       this.own({id: ++this.serial, source, gain, channel: e.channel, note: -1, drumNote: e.note,
-        velocity: e.velocity, program: 0, peak, start: time, end: time + duration,
-        env: {a: 0, d: duration, s: 0, r: 0}, keyDown: false, held: false, releaseTime: time});
+        velocity: e.velocity, program: 0, peak: 1, start: time, end: time + duration,
+        env: {a: 0, d: 0, s: 1, tail: 0, r: 0}, keyDown: false, held: false, releaseTime: null});
     }
     drum(e, time) {
-      // Deliberately retain approximation labels. Removed the invented parity-based PC50 mapping.
-      this.warnings.add('Percussion is approximate; special drum program 50 is not decoded');
-      const n = e.note;
-      if (n === 35 || n === 36) this.drumPart(e, time, 'tone', 0.14, 0.55, n === 35 ? 92 : 110, 43);
-      else if (n === 38 || n === 40) {
-        this.drumPart(e, time, 'noise', 0.10, 0.38);
-        this.drumPart(e, time, 'tone', 0.085, 0.22, n === 38 ? 185 : 205, 105);
-      } else if (n === 42 || n === 44) this.drumPart(e, time, 'noise', 0.045, 0.20);
-      else if (n === 46) this.drumPart(e, time, 'noise', 0.17, 0.18);
-      else if (n === 49 || n === 57) this.drumPart(e, time, 'noise', 0.28, 0.22);
-      else if ([41, 43, 45, 47, 48, 50].includes(n)) {
-        const f = 72 + (n - 41) * 17; this.drumPart(e, time, 'tone', 0.13, 0.32, f * 1.28, f);
-      } else this.drumPart(e, time, 'noise', 0.065, 0.18);
+      this.warnings.add('PSG recipes decoded; noise stream, mixer and special program 50 are not bit-exact');
+      for (const recipe of this.drumRecipes(e.note)) this.drumPart(e, time, recipe);
     }
     event(e, time) {
       if (e.type === 'sysex') { this.warnings.add('SysEx not synthesized'); return; }

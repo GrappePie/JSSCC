@@ -114,7 +114,7 @@ test('program change leaves existing voice waveform unchanged', () => {
 });
 test('release tails remain counted until their scheduled end', () => {
   const {s} = setup(); s.event(on(), 0); s.event({type: 'off', channel: 0, note: 60}, 0.1);
-  assert.equal(s.active(0.2).length, 1); assert.equal(s.active(4).length, 0);
+  assert.equal(s.active(0.125).length, 1); assert.equal(s.active(0.151).length, 0);
 });
 test('one Note Off does not terminate every overlapping same-pitch voice', () => {
   const {s} = setup(); s.event(on(), 0); s.event(on(), 0.1); s.event({type: 'off', channel: 0, note: 60}, 0.2);
@@ -170,4 +170,62 @@ test('generated WAV has correct PCM header and zero samples', () => {
 test('all runtime data matches the byte-verified B236E dump digest', () => {
   const hash = require('node:crypto').createHash('sha256').update(JSON.stringify(D)).digest('hex');
   assert.equal(hash, '0d751ab90311fee90c9cb9c613c6159e9c4d08d8d554cfa270a5e6e750be7766');
+});
+
+test('B236E fifth field is key-off release, fourth is held-key decay', () => {
+  const {s} = setup(); const e = s.envelope(0);
+  assert.equal(e.tail, 3); assert.equal(e.r, 0.05);
+  assert.equal(s.envelope(16).tail, 0); assert.equal(s.envelope(16).r, 0.04);
+});
+test('piano held-key stage decays linearly and naturally terminates', () => {
+  const {s} = setup(); const v = s.noteOn(on(), 0);
+  const t = v.env.a + v.env.d;
+  assert.ok(Math.abs(s.amplitudeAt(v, t + 1.5) - v.peak * v.env.s / 2) < 1e-9);
+  assert.ok(Math.abs(v.end - (3649 / 44100 + 3)) < 1e-9);
+  assert.equal(s.active(3.1).length, 0);
+});
+test('organ zero held-key decay means sustain, not an immediate cut', () => {
+  const {s} = setup(); s.states[0].program = 16; const v = s.noteOn(on(), 0);
+  assert.equal(s.amplitudeAt(v, 1), s.amplitudeAt(v, 20)); assert.equal(v.end, Infinity);
+});
+test('key-off anchors gain before scheduling a linear release', () => {
+  const {s} = setup(); const v = s.noteOn(on(), 0); const value = s.amplitudeAt(v, 2);
+  s.noteOff(0, 60, 2);
+  const events = v.gain.gain.events;
+  assert.ok(events.some(e => e[0] === 'set' && e[2] === 2 && Math.abs(e[1] - value) < 1e-9));
+  assert.deepEqual(events.at(-1), ['linear', 0, 2.05]);
+  assert.ok(Math.abs(s.amplitudeAt(v, 2.025) - value / 2) < 1e-9);
+});
+test('early note-off during attack releases from the current level', () => {
+  const {s} = setup(); s.states[0].program = 40; const v = s.noteOn(on(), 0);
+  s.noteOff(0, 60, 0.02);
+  assert.ok(Math.abs(v.releaseLevel / v.peak - 0.5) < 1e-9);
+  assert.ok(Math.abs(v.end - 0.06) < 1e-9);
+});
+test('seek restores the natural-decay stage instead of a constant sustain', () => {
+  const {s} = setup(); const v = s.noteOn(on(), 10, {program: 0, age: 2});
+  assert.ok(Math.abs(v.end - (8 + 3649 / 44100 + 3)) < 1e-9);
+  assert.ok(s.amplitudeAt(v, 10) < v.peak * v.env.s / 2);
+});
+test('standard kick35 and kick36 share the decoded recipe', () => {
+  const {s} = setup(); assert.deepEqual(s.drumRecipes(35), s.drumRecipes(36));
+  assert.deepEqual(s.drumRecipes(35)[0], ['tone', 540, 38, 1.8, -0.004, 0]);
+});
+test('standard toms, crash and ride use distinct decoded recipes', () => {
+  const {s} = setup(); assert.equal(s.drumRecipes(41)[0][2], 50);
+  assert.equal(s.drumRecipes(45)[0][2], 58); assert.equal(s.drumRecipes(50)[0][2], 66);
+  assert.equal(s.drumRecipes(49)[0][1], 15000); assert.equal(s.drumRecipes(51)[0][2], 120);
+});
+test('all standard drum notes render finite buffers at supported sample rates', () => {
+  for (const rate of [22050, 44100, 48000]) {
+    const {c, s} = setup(); c.sampleRate = rate;
+    for (let n = 0; n < 128; n++) {
+      s.drum({...on(n, 9), velocity: 127}, n);
+      for (const v of s.active(n)) assert.ok(v.source.buffer.getChannelData(0).every(Number.isFinite));
+    }
+  }
+});
+test('zero initial volume creates no invalid drum divisions or voices', () => {
+  const {s} = setup(); s.states[9].volume = 0; s.drum(on(38, 9), 0);
+  assert.equal(s.voices.length, 0);
 });
