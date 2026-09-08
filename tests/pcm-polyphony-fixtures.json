@@ -1,0 +1,66 @@
+{
+  "provenance": {
+    "run": 34249333054,
+    "artifact": 10065505132,
+    "midiSha256": "eb6eac183caee9c77a051a42576188c1a9864f78ef03074f967ad4b2674e0121"
+  },
+  "scope": "Nine 10000-frame aligned chord prefixes. One shared initial stagger state=240, inferred from first single-note onset before looking at chords. Default state=0 still differs; not whole-file equality. No normalization or resampling.",
+  "initialStagger": 240,
+  "cases": [
+    {
+      "name": "polyphony-1",
+      "tick": 16416,
+      "frames": 10000,
+      "nativeSha256": "9146c35444859f5a1789b69140623f6126360f3f7297d55d5d94fe9172446390"
+    },
+    {
+      "name": "polyphony-2",
+      "tick": 17376,
+      "frames": 10000,
+      "nativeSha256": "bd112732c3c1c48ddf0f184582c3d63f432c5dd8f3adfbb4df8972593c2b34fa"
+    },
+    {
+      "name": "polyphony-4",
+      "tick": 18336,
+      "frames": 10000,
+      "nativeSha256": "d5c69f74f73be7ff375d73b6ef89dfa2dcdec226932798eef77801d7824a712e"
+    },
+    {
+      "name": "polyphony-8",
+      "tick": 19296,
+      "frames": 10000,
+      "nativeSha256": "b4cfa689ae4a66c03134af6c6f122681bdf81dc51228c97a95fe470bd26e7bc3"
+    },
+    {
+      "name": "polyphony-32",
+      "tick": 20256,
+      "frames": 10000,
+      "nativeSha256": "3866ac5bc40bcfc72e35d301285cdaec857fe27c5b9286d7146b9da60654f23b"
+    },
+    {
+      "name": "polyphony-45",
+      "tick": 21216,
+      "frames": 10000,
+      "nativeSha256": "71725f33d6e39967e46bcc77ff7170476a1c3500af1cf0430dac671f8c4afccf"
+    },
+    {
+      "name": "polyphony-46",
+      "tick": 22176,
+      "frames": 10000,
+      "nativeSha256": "75904d3c32f7015067e7b22efbcf7cf8b3e23507a3d8c715b5318bd4be304241"
+    },
+    {
+      "name": "polyphony-47",
+      "tick": 23136,
+      "frames": 10000,
+      "nativeSha256": "4e7ae0a92523c329a468acbcdf71e289fb5df4a987ef3d23c8653ef96002e241"
+    },
+    {
+      "name": "polyphony-64",
+      "tick": 24096,
+      "frames": 10000,
+      "nativeSha256": "3d349f50a794a0497acea9fb099e0b22adb7619a5f26ac2d70d8ff9cc2eaa0b8"
+    }
+  ],
+  "midiDeflateBase64": "5dE7bgIxFIXhM4kEUqJILME7CO/nwJh3RRGJBVA4UqR02cA4r95byA7cpstS2Ak5VgqKVMwdaTRQfBIM9j/Yd7N9MgAqFEX7zfblGbj7xuHhuvqldl4Dvmrgb1P4Gw3/yO9c7ytX/MxnJsUeGj81/nxc6mLzpmyMT3VSoCYNKGkgkQa0NLCTBtI8jgBpIJIGlDSgCx1jCKR5/ANIA0oa0AVdoqubd9g6PvRpm+AafxthG5k2wzWpdYzANqklisG1qUNd6v2Pw7apQ13q5foyuD4NaEgjEwYCN6YJJaRpSjOa04KWtKK1ER8Gtk8DGtKIYhrThBLiWe2UZjSnBS1pRWuc02Vl6Rd+wVn65z6U0C/lYEL/EoYT+qUdUOhfypDy6Jd60Hn0X/XhHr8="
+}
