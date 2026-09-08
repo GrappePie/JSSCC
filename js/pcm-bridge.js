@@ -10,8 +10,32 @@
   async function prepare(context) {
     if(!context.audioWorklet||typeof AudioWorkletNode==='undefined')throw Error('AudioWorklet no está disponible; selecciona el motor Web Audio anterior.');
     if(!prepared.has(context)) {
-      const promise=context.audioWorklet.addModule(moduleURL || new URL('./js/pcm-worklet.js?v=pcm-3',document.baseURI).href).catch(e=>{prepared.delete(context);throw e;});
-      prepared.set(context,promise);
+      // Fetch on the main scope, then bundle the exact kernel and processor into
+      // one module. No eval, external service or replacement audio implementation.
+      const loading=(async()=>{
+        const url=moduleURL || new URL('./js/pcm-worklet.js?v=pcm-3',document.baseURI).href;
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),10000);
+        let objectURL=null, moduleTimer=null;
+        try {
+          const files=await Promise.all([new URL('./pcm-core.js?v=pcm-3',url).href,url].map(async path=>{
+            const response=await fetch(path,{signal:controller.signal});
+            if(!response.ok)throw Error('No se pudo cargar el módulo PCM: '+response.status);
+            return response.text();
+          }));
+          const importLine="import './pcm-core.js';\n";
+          if(!files[1].startsWith(importLine))throw Error('Formato de procesador PCM inesperado');
+          objectURL=URL.createObjectURL(new Blob([files[0],'\n',files[1].slice(importLine.length)],{type:'text/javascript'}));
+          await Promise.race([
+            context.audioWorklet.addModule(objectURL),
+            new Promise((_,reject)=>{moduleTimer=setTimeout(()=>reject(Error('No se pudo iniciar AudioWorklet; selecciona el motor anterior')),8000);})
+          ]);
+        } finally {
+          clearTimeout(timeout);clearTimeout(moduleTimer);
+          if(objectURL)URL.revokeObjectURL(objectURL);
+        }
+      })().catch(error=>{prepared.delete(context);throw error;});
+      prepared.set(context,loading);
     }
     return prepared.get(context);
   }
