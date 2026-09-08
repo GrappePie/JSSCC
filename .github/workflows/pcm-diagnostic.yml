@@ -2,7 +2,7 @@ name: PCM startup diagnostic
 on:
   push:
     branches: [fix/pcm-matrix-20260908]
-    paths: [.github/workflows/pcm-diagnostic.yml, tests/pcm_startup_diagnostic.py, tests/worklet_platform_probe.py]
+    paths: [.github/workflows/pcm-diagnostic.yml, tests/pcm_offline_worklet.py]
 permissions:
   contents: read
 jobs:
@@ -18,7 +18,7 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install playwright==1.55.0
       - run: python -m playwright install --with-deps chromium
-      - run: python tests/worklet_platform_probe.py
+      - run: python tests/pcm_offline_worklet.py
       - if: always()
         uses: actions/upload-artifact@v4
         with:
