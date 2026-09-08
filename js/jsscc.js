@@ -31,6 +31,8 @@ var CanvasRenderer = (function () {
             window.addEventListener("load", onload, false);
         }
         this.loader.onload.push(function () {
+            // Assets can finish before window.load; later observers need canvas/hitDetector.
+            _this.initCanvas();
             _this.loadEvents--;
             _this.switchPalette(Cookies.get("palette", "default"));
             if (_this.loadEvents === 0) {

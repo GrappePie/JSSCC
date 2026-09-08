@@ -53,6 +53,8 @@ class CanvasRenderer {
         }
 
         this.loader.onload.push(() => {
+            // Assets can finish before window.load; later observers need canvas/hitDetector.
+            this.initCanvas();
             this.loadEvents--;
             this.switchPalette(Cookies.get("palette", "default"));
             if (this.loadEvents === 0) { this.firstDraw(); }
