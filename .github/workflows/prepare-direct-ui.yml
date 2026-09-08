@@ -1,0 +1,136 @@
+name: Prepare direct playback UI blobs
+on:
+  push:
+    branches: [feat/direct-sequence-play-20260908]
+    paths: [.github/workflows/prepare-direct-ui.yml]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Apply reviewed UI edits and create immutable blobs only
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          from pathlib import Path
+          import json,hashlib,os,urllib.request
+          p=Path('.')
+          f=p/'js/edition-ui.js';s=f.read_text()
+          s=s.replace('const midiFiles=new Map();', "const remote=new window.JSSCCSequenceRemote.Importer();\n    let remoteController=null,remoteId=null,remoteSerial=0,remoteReport=null;\n    const midiFiles=new Map();")
+          s=s.replace('Enlaces a Online Sequencer e importación local de MIDI. No es una colaboración oficial.','Escucha secuencias de Online Sequencer en chiptune con un clic. Integración no oficial.')
+          s=s.replace('Para escuchar aquí, exporta el MIDI en la página original y cárgalo en su tarjeta.','Pulsa Escuchar chiptune: se obtiene la secuencia con nuestro servicio auxiliar y se convierte en memoria. No se guarda en tu carpeta de descargas.')
+          s=s.replace("const feedback=el('p','edition-feedback');", "const cancel=el('button','edition-cancel','Cancelar carga');cancel.type='button';cancel.id='edition-cancel-load';cancel.hidden=true;drawer.append(cancel);\n    const feedback=el('p','edition-feedback');")
+          s=s.replace('Abre la canción original → Export MIDI → Cargar MIDI y escuchar. El archivo se sintetiza aquí; no se reproduce una grabación de Online Sequencer. La asociación entre el enlace y el archivo la eliges tú, no se verifica automáticamente.','Escuchar chiptune obtiene las notas y tiempos mediante JSSCC Sequence Bridge (alojado en Lovable), los convierte en MIDI en memoria y los reproduce con el motor seleccionado. No se descarga una grabación: el sonido lo genera JSSCC. Efectos y sintetizadores especiales se reinterpretan; los avisos de conversión aparecen junto a la canción.')
+          s=s.replace('Los MIDI asociados se conservan solo durante esta sesión (máximo 32 MiB en conjunto). Se guardan únicamente tus enlaces en este navegador; no se suben los archivos. Usa música propia o con los permisos necesarios.','La conversión se conserva temporalmente en memoria (hasta 5 minutos, máximo 8 canciones y 32 MiB). El servicio auxiliar tiene caché temporal de 5 minutos y recibe tu dirección IP para limitar solicitudes. No enviamos cookies ni archivos locales. Importar MIDI local sigue disponible como opción independiente. Usa música propia o con los permisos necesarios.')
+          s=s.replace('La carga automática del catálogo y de las canciones está pendiente: las respuestas comprobadas no habilitan CORS para nuestra página. No usamos proxies públicos, credenciales ni descargas masivas. Una API habilitada o un servicio acordado con Online Sequencer permitiría completar el flujo de un clic.','El catálogo sigue siendo una selección de enlaces, no un listado en directo. La carga individual usa un servicio propio limitado a IDs de Online Sequencer, no un proxy de URLs arbitrarias. No hay descarga anticipada al abrir la biblioteca, ni reintentos masivos. Una canción privada, eliminada o de formato no compatible puede no reproducirse.')
+          s=s.replace('Cómo funciona la reproducción y qué falta para conectar el catálogo','Cómo funciona la reproducción directa y sus límites')
+          pos=s.index('    async function playItem(item,file){')
+          s=s[:pos]+'''    function cancelRemote(message='Carga cancelada.') {
+                if(!remoteController)return;
+                remoteSerial++;remoteController.abort();remoteController=null;remoteId=null;cancel.hidden=true;
+                if(message)tell(message);render();
+              }
+              cancel.onclick=()=>cancelRemote();
+              drawer.addEventListener('close',()=>cancelRemote(''));
+              window.addEventListener('jsscc-player-action',e=>{
+                if(e.detail?.owner!=='sequence-remote')cancelRemote('Carga cancelada por otro control del reproductor.');
+              });
+              function showRemoteSource(item,report){
+                creditSeq=window.JSSCCMidi.current;remoteReport=report;
+                source.replaceChildren(document.createTextNode('Secuencia online: '),link(item.title+' · '+item.author,item.url),
+                  document.createTextNode(' | Convertida en memoria · '+report.noteCount+' notas · reinterpretación chiptune'));
+                if(report.warnings.length){const details=el('details','edition-conversion-warnings');details.append(el('summary','',report.warnings.length+' avisos de conversión'));for(const w of report.warnings)details.append(el('p','',w));source.append(details);}
+                source.hidden=false;window.dispatchEvent(new Event('resize'));
+              }
+              async function playRemote(item){
+                if(busy)return false;
+                cancelRemote('');const serial=++remoteSerial,controller=new AbortController();
+                remoteController=controller;remoteId=item.id;cancel.hidden=false;render();
+                tell('Obteniendo '+item.title+'…');
+                try {
+                  const player=window.JSSCCMidi;if(!player)throw Error('El reproductor aún no está listo');
+                  // Called during this genuine click, before network/worker awaits.
+                  await player.unlockAudio();
+                  const result=await remote.get(item,{signal:controller.signal,onProgress:(stage,bytes)=>{
+                    if(serial!==remoteSerial)return;
+                    tell(stage==='convert'?'Convirtiendo notas a chiptune…':stage==='cache'?'Cargando conversión de memoria…':'Obteniendo secuencia… '+Math.ceil(bytes/1024)+' KiB');
+                  }});
+                  if(controller.signal.aborted||serial!==remoteSerial)return false;
+                  const name=(item.title||'Online Sequencer').replace(/[\\\\/:*?"<>|\\x00-\\x1f]/g,'_').slice(0,100)+'-os'+item.id+'.mid';
+                  const file=new File([result.bytes],name,{type:'audio/midi'});
+                  if(!await player.loadFile(file,{owner:'sequence-remote',signal:controller.signal}))throw Error('No se pudo cargar la secuencia convertida');
+                  if(controller.signal.aborted||serial!==remoteSerial)return false;
+                  showRemoteSource(item,result.report);
+                  const played=await player.play({owner:'sequence-remote'});
+                  if(controller.signal.aborted||serial!==remoteSerial)return false;
+                  if(!played)throw Error('Secuencia cargada; pulsa Reproducir para habilitar el audio de tu navegador.');
+                  tell('Reproduciendo '+item.title+' · '+result.report.noteCount+' notas.');
+                  remoteController=null;remoteId=null;cancel.hidden=true;drawer.close();return true;
+                } catch(e) {
+                  if(serial===remoteSerial)tell(e.name==='AbortError'?'Carga cancelada.':e.message,e.name!=='AbortError');
+                  return false;
+                } finally {if(serial===remoteSerial){remoteController=null;remoteId=null;cancel.hidden=true;render();}}
+              }
+          '''.replace('\n          ','\n') + s[pos:]
+          s=s.replace("if(busy)return false;busy=true;render();tell('Cargando MIDI local", "if(busy)return false;cancelRemote('');busy=true;render();tell('Cargando MIDI local")
+          s=s.replace("file?'MIDI LOCAL ASOCIADO':'ENLACE · REQUIERE MIDI'","file?'MIDI LOCAL DISPONIBLE':'ESCUCHA DIRECTA · CHIPTUNE'")
+          start=s.index("        const play=el('button','edition-play'");end=s.index('        if(file){',start)
+          s=s[:start]+'''        const play=el('button','edition-play',remoteId===item.id?'Cargando…':'▶ Escuchar chiptune');play.type='button';play.disabled=busy||remoteId===item.id;
+                  play.onclick=()=>playRemote(item);card.append(play);
+                  const local=el('button','edition-import','Importar MIDI local');local.type='button';local.disabled=busy;
+                  local.onclick=()=>{cancelRemote('');selectedId=item.id;fileInput.value='';fileInput.click();};card.append(local);
+          '''.replace('\n          ','\n')+s[end:]
+          s=s.replace("        if(file){\n          const detail", "        if(file){\n          const replay=el('button','edition-replay','▶ Reproducir chiptune local');replay.type='button';replay.disabled=busy;replay.onclick=()=>playItem(item,file);card.append(replay);\n          const detail")
+          s=s.replace('remoteThumbnails:thumbnails})','remoteThumbnails:thumbnails,remotePlayback:true,remoteLoading:remoteId,remote:remote.diagnostics(),lastConversion:remoteReport})');f.write_text(s)
+          f=p/'js/gxscc-exact-engine-v3.js';s=f.read_text()
+          s=s.replace('  async function setEngine(value) {', '''  function announceAction(action, owner) {
+              window.dispatchEvent(new CustomEvent('jsscc-player-action', {detail:{action, owner:owner || 'player'}}));
+            }
+            function unlockAudio() {
+              const AC=window.AudioContext || window.webkitAudioContext;
+              if(!AC) return Promise.reject(new Error('Este navegador no admite Web Audio'));
+              if(!context || context.state==='closed') context=new AC({sampleRate:44100});
+              // Previously played contexts are already gesture-authorized; do not unpause
+              // the old song merely while a different sequence is downloading.
+              if(transport && transport.state==='paused') return Promise.resolve();
+              return context.resume();
+            }
+            async function setEngine(value) {
+              announceAction('engine');'''.replace('\n          ','\n'))
+          s=s.replace('  async function request(action, value) {','  async function request(action, value, options = {}) {\n    announceAction(action, options.owner);')
+          s=s.replace('  async function loadFile(file) {',"  async function loadFile(file, options = {}) {\n    announceAction('load', options.owner);")
+          s=s.replace('if (id !== requestId) return false;','if (id !== requestId || options.signal?.aborted) return false;')
+          s=s.replace("loadFile, parseMidi: P.parseMidi, play: () => request('play'), pause:","loadFile, unlockAudio, parseMidi: P.parseMidi, play: options => request('play', undefined, options), pause:");f.write_text(s)
+          f=p/'js/edition-info.js';f.write_text(f.read_text().replace("version:'0.1.0'","version:'0.2.0'"))
+          f=p/'index.html';s=f.read_text().replace('edition-info.js?v=edition-1','edition-info.js?v=edition-2').replace('edition-ui.js?v=edition-1','edition-ui.js?v=edition-2').replace('edition.css?v=edition-1','edition.css?v=edition-2').replace('gxscc-exact-engine-v3.js?v=ui-live-1','gxscc-exact-engine-v3.js?v=remote-play-1');s=s.replace('  <script src="./js/edition-ui.js', '  <script src="./js/sequence-remote.js?v=remote-play-1"></script>\n  <script src="./js/edition-ui.js');f.write_text(s)
+          f=p/'css/edition.css';f.write_text(f.read_text()+'\n.edition-import,.edition-replay { margin-top: 7px; font-size: 11px; width: 100%; }\n.edition-import { opacity: .85; }\n.edition-cancel { margin-top: 10px; }\n.edition-conversion-warnings { margin-top: 5px; font-size: 11px; }\n.edition-conversion-warnings p { margin: 4px 0; }\n')
+          f=p/'tests/edition-regressions.cjs';f.write_text(f.read_text().replace("E.version,'0.1.0'","E.version,'0.2.0'"))
+          f=p/'tests/edition_browser.py';s=f.read_text().replace('v0.1.0','v0.2.0').replace("with page.expect_file_chooser() as fc:card.locator('.edition-play').click()", "with page.expect_file_chooser() as fc:card.locator('.edition-import').click()").replace("first.locator('.edition-play')","first.locator('.edition-replay')");f.write_text(s)
+          expected={'js/edition-ui.js':'b99de9617a90e476e70e6083b1c170ffb50fc55ae8d3b1cfc69a7bbc0e1f457b','js/gxscc-exact-engine-v3.js':'904efa2974e60d5a3fb8d96eeb222d57cbd9d7edac5ae300223adac12d38e286','js/edition-info.js':'16950f3b09d0083b4be8e9b385bed017b44ac110b5ab8038b193b7cb43cbdf62','index.html':'4ea8184f24c47ae8c28728272be54102e4acc9997980e00d8dcd5e18616b0df8','css/edition.css':'93412abd4e6838d3d5ab83e3ea44adfb9ba630c4c5480b5d52b4ccae773d953a','tests/edition-regressions.cjs':'807057d240ded04382ad975da5fe19a0f6c8a9a6809eb12aa45aa667f06fe573','tests/edition_browser.py':'73e2672702acc75f7ad48adec4bf034c2b4c232e355b8dae0669fa486bb6d901'}
+          out=Path('prepared');out.mkdir();receipts=[]
+          for name,digest in expected.items():
+              raw=Path(name).read_bytes();actual=hashlib.sha256(raw).hexdigest()
+              if actual!=digest:
+                  (out/'mismatch.txt').write_text(name+' '+actual+' expected '+digest)
+                  (out/'mismatch-source.txt').write_bytes(raw)
+                  raise ValueError('Prepared content hash mismatch: '+name)
+          assert os.environ['GITHUB_REPOSITORY']=='GrappePie/JSSCC'
+          for name,digest in expected.items():
+              raw=Path(name).read_bytes();payload=json.dumps({'content':raw.decode(),'encoding':'utf-8'}).encode()
+              req=urllib.request.Request('https://api.github.com/repos/GrappePie/JSSCC/git/blobs',data=payload,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req,timeout=20) as r:blob=json.load(r)
+              receipts.append({'path':name,'sha':blob['sha'],'sha256':digest})
+          (out/'blobs.json').write_text(json.dumps(receipts,indent=2))
+          print(json.dumps(receipts,indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prepared-direct-ui-blobs
+          path: prepared
+          retention-days: 7
