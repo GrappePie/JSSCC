@@ -35,7 +35,8 @@ jobs:
       - name: Test integer PCM kernel, 992 native prefixes and state-conditioned chords
         run: node --test tests/pcm-regressions.cjs tests/pcm-polyphony.cjs | tee test-results/pcm-node-tests.txt
       - name: Install pinned browser test dependencies
-        run: python -m pip install playwright==1.55.0 numpy==2.2.6
+        # Playwright 1.55 stalls AudioWorklet targets (microsoft/playwright#37592).
+        run: python -m pip install playwright==1.56.0 numpy==2.2.6
       - name: Install Chromium for end-to-end tests
         run: python -m playwright install --with-deps chromium
       - name: Generate original synthetic MIDI corpus
