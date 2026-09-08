@@ -11,3 +11,6 @@
 .jsscc-controls small { opacity: .72; font-size: 10px; }
 #jsscc-drop { position: fixed; inset: 10px; z-index: 100; display: none; align-items: center; justify-content: center; background: #291b18ed; color: #fff2dc; border: 3px dashed currentColor; font: bold 25px monospace; pointer-events: none; }
 #jsscc-drop.visible { display: flex; }
+
+#jsscc-flow { display: block; font: 12px monospace; margin-top: 5px; }
+#jsscc-buffer-help { display: block; opacity: .8; font-size: 11px; }

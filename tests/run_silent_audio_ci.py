@@ -9,7 +9,7 @@ import json, runpy, sys
 from pathlib import Path
 from playwright.sync_api import Browser
 ROOT=Path(__file__).resolve().parents[1]
-if len(sys.argv)!=3 or sys.argv[1] not in ('browser_regressions.py','pcm_browser.py'):
+if len(sys.argv)!=3 or sys.argv[1] not in ('browser_regressions.py','pcm_browser.py','ui_browser.py'):
     raise SystemExit('Specify a supported browser suite and output directory')
 target=ROOT/'tests'/sys.argv[1]
 out=Path(sys.argv[2]);out.mkdir(parents=True,exist_ok=True)

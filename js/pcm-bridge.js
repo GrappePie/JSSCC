@@ -5,7 +5,7 @@
   'use strict';
   const PCM=root.JSSCCPCM;
   const scriptURL=document.currentScript && document.currentScript.src;
-  const moduleURL=scriptURL?new URL('./pcm-worklet.js?v=pcm-3',scriptURL).href:null;
+  const moduleURL=scriptURL?new URL('./pcm-worklet.js?v=ui-live-1',scriptURL).href:null;
   const prepared=new WeakMap();
   async function prepare(context) {
     if(!context.audioWorklet||typeof AudioWorkletNode==='undefined')throw Error('AudioWorklet no está disponible; selecciona el motor Web Audio anterior.');
@@ -13,7 +13,7 @@
       // Fetch on the main scope, then bundle the exact kernel and processor into
       // one module. No eval, external service or replacement audio implementation.
       const loading=(async()=>{
-        const url=moduleURL || new URL('./js/pcm-worklet.js?v=pcm-3',document.baseURI).href;
+        const url=moduleURL || new URL('./js/pcm-worklet.js?v=ui-live-1',document.baseURI).href;
         const controller=new AbortController();
         const timeout=setTimeout(()=>controller.abort(),10000);
         let objectURL=null, moduleTimer=null, warmup=null, silence=null;
@@ -26,14 +26,14 @@
             silence.gain.value=0;warmup.connect(silence).connect(context.destination);warmup.start();
             await context.resume();
           }
-          const files=await Promise.all([new URL('./pcm-core.js?v=pcm-3',url).href,url].map(async path=>{
+          const files=await Promise.all([new URL('./pcm-core.js?v=ui-live-1',url).href,new URL('./ui-meter-data.js?v=ui-live-1',url).href,url].map(async path=>{
             const response=await fetch(path,{signal:controller.signal});
             if(!response.ok)throw Error('No se pudo cargar el módulo PCM: '+response.status);
             return response.text();
           }));
-          const importLine="import './pcm-core.js';\n";
-          if(!files[1].startsWith(importLine))throw Error('Formato de procesador PCM inesperado');
-          objectURL=URL.createObjectURL(new Blob([files[0],'\n',files[1].slice(importLine.length)],{type:'text/javascript'}));
+          const importLine="import './pcm-core.js';\nimport './ui-meter-data.js';\n";
+          if(!files[2].startsWith(importLine))throw Error('Formato de procesador PCM inesperado');
+          objectURL=URL.createObjectURL(new Blob([files[0],'\n',files[1],'\n',files[2].slice(importLine.length)],{type:'text/javascript'}));
           await Promise.race([
             context.audioWorklet.addModule(objectURL),
             new Promise((_,reject)=>{moduleTimer=setTimeout(()=>reject(Error('No se pudo iniciar AudioWorklet; selecciona el motor anterior')),8000);})
@@ -65,6 +65,7 @@
         }
         if(m.telemetry) {
           this.items=m.active;this.stats=m.stats;this.warnings=new Set(m.warnings);
+          this.meterPacket={sequence:m.sequence,channels:m.meters,frame:m.frame,contextFrame:m.contextFrame,receivedAt:performance.now()};
           this.states=m.states.map(s=>({...s,volume:s.volume/127,expression:s.expression/127,pan:(s.pan-64)/(s.pan<64?64:63)}));
         }
         if(m.ended&&this.onEnded)this.onEnded();
@@ -83,7 +84,7 @@
     wave(program){return this.data.wavetables[this.data.instrumentSets[this.bank].map[program&127]];}
     active(){return this.items;}
     mute(channel,value){this.muted[channel]=value;this.command('mute',{channel,value});}
-    reset(){this.items=[];this.command('reset');this.muted.forEach((v,c)=>this.mute(c,v));}
+    reset(){this.items=[];this.meterPacket=null;this.command('reset');this.muted.forEach((v,c)=>this.mute(c,v));}
     dispose(){
       this.node.disconnect();this.node.port.close();this.master.disconnect();
       for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Audio disposed'));}this.pending.clear();

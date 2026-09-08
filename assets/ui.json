@@ -31,7 +31,7 @@
             ["bounds", 0, 0, 34, 14]
         ],
         "channelPoly": [
-            ["filledRect", 19, 5, 10, 4, "&foreground"],
+            ["filledRect", 19, 5, 10, 4, "$this.polyToColor(this.chan.mute ? 0 : (this.chan.polyDisplay || this.chan.poly))"],
             ["bounds", 19, 5, 10, 4]
         ],
         "channelVENLabels": [
@@ -90,7 +90,7 @@
         ],
         "channelHoldSoft": [
             ["strokeRect", 0, 149, 15, 9, "&foreground"],
-            ["filledRect", 2, 151, 11, 5, "&dark"],
+            ["filledRect", 2, 151, 11, 5, "$this.chan.hold ? this.palette.light : this.palette.dark"],
             ["strokeRect", 2, 151, 11, 5, "&foreground"],
             ["strokeRect", 18, 149, 15, 9, "&foreground"],
             ["filledRect", 20, 151, 11, 5, "&dark"],
@@ -171,7 +171,6 @@
         "buffer": [
             ["filledRect", 412, 32, 219, 9, "&background"],
             ["pbar", "$this.song.buffer", 413, 33, 218, 8, "&light"],
-            ["filledRect", 412, 32, 219, 9, "&background"],
             ["strokeRect", 412, 32, 219, 9, "&foreground"],
             ["bounds", 412, 32, 220, 10]
         ],
@@ -193,9 +192,9 @@
             ["strokeRect", 159, 421, 20, 9, "&foreground"],
             ["filledRect", 198, 421, 20, 9, "&background"],
             ["strokeRect", 198, 421, 20, 9, "&foreground"],
-            ["text", "small", "00 : 00 : 00 '000", 131, 423, "&white", true, 1],
-            ["text", "small", "000", 178, 423, "&white", true],
-            ["text", "small", "000", 217, 423, "&white", true],
+            ["text", "small", "$this.song.timeText || \"00 : 00 : 00 '000\"", 131, 423, "&white", true, 1],
+            ["text", "small", "$String(this.song.bpm || 0).padStart(3, '0')", 178, 423, "&white", true],
+            ["text", "small", "$String(this.song.ppq || 0).padStart(3, '0')", 217, 423, "&white", true],
             ["bounds", 58, 421, 161, 10]
         ],
         "repeat": [

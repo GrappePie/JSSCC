@@ -7,6 +7,8 @@
   let midi = null, context = null, synth = null, transport = null, instrumentSet = 0;
   let requestId = 0, lastUiState = 0, pending = 0, exporting = false;
   let picker, status, seekBar, controls, gainInput, versionLabel, engineSelect;
+  const monitor = new window.JSSCCUIMonitor.Monitor();
+  let flowLabel = null;
   let engineMode = window.JSSCC_DEFAULT_ENGINE === 'legacy' ? 'legacy' : 'pcm';
   let initializing = null, pcmDuration = null;
   const selectedAudio = () => engineMode === 'pcm' ? window.JSSCCPCMBridge : A;
@@ -49,7 +51,7 @@
       if (transport) await transport.stop();
       if (synth) synth.dispose();
       transport=null;synth=null;engineMode=value;setUiState(0);
-      engineSelect.value=value;versionLabel.textContent='Experimental · '+version()+' · equivalencia completa no validada';
+      engineSelect.value=value;versionLabel.textContent='Experimental · '+version()+' · UI '+JSSCCUIMonitor.VERSION+' · equivalencia completa no validada';
       if (midi) { seekBar.value=0; seekBar.dataset.last='0'; const u=getUi(); if(u&&u.song)u.song.position=0; }
       message(value==='pcm'?'PCM B236E: oscilador y mezcla enteros; reloj y controladores compatibles. Ruido y casos especiales aún experimentales.':'Motor Web Audio anterior seleccionado.');
     } finally {pending--;}
@@ -120,7 +122,7 @@
     const select = document.getElementById('jsscc-set'); if (select) select.value = String(value);
     // A new set only affects future notes; never silence an already-playing song.
   }
-  function renderUi() {
+  function renderUi(now = performance.now()) {
     const u = getUi(); if (!u || !u.song) return;
     if (!pending && u.song.playState !== lastUiState) {
       const requested = u.song.playState; lastUiState = requested;
@@ -141,23 +143,22 @@
       u.song.position = p; seekBar.dataset.last = String(p);
       if (!pending) setUiState(stateNumber(transport.state));
     }
-    const active = synth ? synth.active() : [];
     u.song.channels.forEach((ch, i) => {
       if (ch.mute !== muted[i]) { muted[i] = !!ch.mute; if (synth) synth.mute(i, muted[i]); }
-      const list = active.filter(v => v.channel === i), v = list[list.length - 1];
-      ch.poly = list.length; ch.volume = v ? v.velocity / 127 : 0;
-      ch.output = v && !muted[i] ? ch.volume * synth.states[i].volume * synth.states[i].expression : 0;
-      if (synth) { ch.panpot = synth.states[i].pan; ch.expression = synth.states[i].expression; ch.pitchbend = synth.states[i].bend / 8192; }
-      if (v) {
-        ch.freq = Math.round(440 * Math.pow(2, ((v.note >= 0 ? v.note : v.drumNote) - 69) / 12));
-        const samples = v.wave ? v.wave.samples : synth.wave(v.program).samples;
-        ch.wave = x => samples[Math.floor(((x % 1 + 1) % 1) * samples.length)] / 128;
-      }
     });
+    const health=monitor.update({now,song:u.song,synth,context,transport,midi,mode:engineMode,muted,gain:Number(gainInput.value),data:D});
+    if(flowLabel){
+      const labels={active:'Audio activo',stopped:'Detenido',paused:'Pausado',starting:'Iniciando audio',suspended:'Audio suspendido','telemetry-stale':'Telemetría sin actualizar',underrun:'Interrupción reportada por el navegador'};
+      const count=u.song.channels.reduce((n,ch)=>n+ch.poly,0);
+      const text='POLY '+count+' / '+(engineMode==='pcm'?45:46)+' · '+(labels[health.status]||health.status);
+      if(flowLabel.textContent!==text)flowLabel.textContent=text;
+      flowLabel.dataset.state=health.status;
+    }
     if (u.renderer && u.renderer.initialized) {
-      try { u.renderer.redraw(); } catch (error) { message('Error del panel: ' + error.message, true); }
+      try { monitor.panel.draw(u.renderer,u.song); } catch (error) { message('Error del panel: ' + error.message, true); }
     }
   }
+
   function setup() {
     controls = document.createElement('section'); controls.className = 'jsscc-controls'; controls.setAttribute('aria-label', 'Controles MIDI');
     const row = document.createElement('div'); row.className = 'jsscc-control-row'; controls.appendChild(row);
@@ -188,7 +189,13 @@
     seekBar.id = 'jsscc-seek'; seekBar.setAttribute('aria-label', 'Posición de reproducción');
     seekBar.onchange = () => { if (midi) request('seek', Number(seekBar.value) * duration()); }; controls.appendChild(seekBar);
     status = document.createElement('p'); status.id = 'jsscc-status'; status.setAttribute('role', 'status'); controls.appendChild(status);
-    versionLabel = document.createElement('small'); versionLabel.textContent = 'Experimental · ' + version() + ' · equivalencia completa con GXSCC aún no validada'; controls.appendChild(versionLabel);
+    versionLabel = document.createElement('small'); versionLabel.textContent = 'Experimental · ' + version() + ' · UI '+JSSCCUIMonitor.VERSION+' · equivalencia completa con GXSCC aún no validada'; controls.appendChild(versionLabel);
+    flowLabel=document.createElement('output');flowLabel.id='jsscc-flow';
+    flowLabel.title='BUFFER WEB: continuidad observada del flujo de audio, no ocupación de la cola WinMM del original. Una actualización atrasada no demuestra un corte audible. Los fallos de salida sólo se cuentan si el navegador los reporta.';
+    flowLabel.textContent='POLY 0 · Detenido';controls.appendChild(flowLabel);
+    const explanation=document.createElement('small');explanation.id='jsscc-buffer-help';
+    explanation.textContent='BUFFER WEB = estado del flujo de audio; no es la cola de Windows del original.';
+    controls.appendChild(explanation);
     document.body.appendChild(controls);
     const overlay = document.createElement('div'); overlay.id = 'jsscc-drop'; overlay.textContent = 'SUELTA EL MIDI AQUÍ'; document.body.appendChild(overlay);
     let depth = 0;
@@ -217,11 +224,25 @@
     const connectExport = setInterval(() => {
       const u = getUi(); attempts++;
       if (u && u.renderer && u.renderer.hitDetector && u.renderer.hitDetector.regions.export) {
-        try { u.renderer.hitDetector.regions.export.onmouseup.push(exportWav); clearInterval(connectExport); }
+        try { u.renderer.hitDetector.regions.export.onmouseup.push(exportWav);
+          u.renderer.canvas.addEventListener('mousemove',e=>{
+            const x=e.offsetX/u.renderer.scale,y=e.offsetY/u.renderer.scale;
+            if(x>=412&&x<=632&&y>=25&&y<=43)u.renderer.canvas.title=flowLabel.title;
+            else if(x>=58&&x<634){
+              const row=y>=217?1:0,localY=y-49-row*168;
+              const i=row*16+Math.floor((x-58)/36),ch=u.song.channels[i];
+              u.renderer.canvas.title=ch&&localY>=0&&localY<=13?'Canal '+(i+1)+' · '+ch.poly+' voces activas'+(ch.mute?' · silenciado':''):'';
+            }else u.renderer.canvas.title='';
+          });
+          clearInterval(connectExport); }
         catch (_) { if (attempts > 200) clearInterval(connectExport); }
       } else if (attempts > 200) clearInterval(connectExport);
     }, 50);
-    setInterval(renderUi, 35);
+    // One visual loop synchronized with repaint. Keep audio scheduling alive when
+    // the tab is hidden: rAF must never be the only MIDI scheduler.
+    const animate=now=>{renderUi(now);requestAnimationFrame(animate);};
+    requestAnimationFrame(animate);
+    setInterval(()=>{if(transport){transport.repeat=!!(getUi()&&getUi().song.repeat);transport.tick();}},25);
     message('Arrastra un MIDI a la página o pulsa Cargar MIDI');
   }
   window.JSSCCMidi = {
@@ -236,6 +257,7 @@
       activeVoices: synth ? synth.active().length : 0, originalAudioCompared: true, originalAudioEquivalent: false,
       comparisonScope: '128 programs x 8 banks,45 pitch/velocity probes,mixer/control/clock cases; not full equivalence',
       pcmStats: synth && synth.stats || null,
+      ui: monitor.diagnostics(),
       warnings: [...(midi ? midi.warnings : []), ...(synth ? synth.warnings : [])]})
   };
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', setup, {once: true}); else setup();

@@ -1,17 +1,25 @@
 import './pcm-core.js';
+import './ui-meter-data.js';
 /* Same integer PCM kernel as offline exports. The browser only delivers its samples. */
 class B236PCMProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     const p=options.processorOptions;
     this.core=new globalThis.JSSCCPCM.Engine(p.data,{...p.options,outputGain:4}).load(p.midi);
-    this.midi=p.midi;this.playing=!!p.autoplay;this.blocks=0;
+    this.midi=p.midi;this.playing=!!p.autoplay;this.blocks=0;this.meterFrames=0;this.sequence=0;
+    this.meter=new globalThis.JSSCCMeterData.Observer();
+    const originalSample=this.core.voiceSample;
+    this.core.voiceSample=v=>{
+      const value=originalSample.call(this.core,v);
+      this.meter.capture(v,value,this.core.frame,this.core.muted[v.channel]);
+      return value;
+    };
     this.port.onmessage=({data:m})=>{
       try {
         if(m.type==='play')this.playing=true;
         else if(m.type==='pause')this.playing=false;
-        else if(m.type==='reset'){this.core.load(this.midi);this.playing=false;this.primed=false;}
-        else if(m.type==='restore'){this.core.restore(m.snapshot);this.primed=false;}
+        else if(m.type==='reset'){this.core.load(this.midi);this.playing=false;this.primed=false;this.meter.reset();}
+        else if(m.type==='restore'){this.core.restore(m.snapshot);this.primed=false;this.meter.reset();}
         else if(m.type==='bank')this.core.options.instrumentSet=m.value;
         else if(m.type==='mute')this.core.muted[m.channel]=m.value;
         if(m.id)this.port.postMessage({ack:m.id,frame:this.core.frame,contextFrame:currentFrame});
@@ -20,7 +28,7 @@ class B236PCMProcessor extends AudioWorkletProcessor {
     };
   }
   report() {
-    this.port.postMessage({telemetry:true,playing:this.playing,frame:this.core.frame,contextFrame:currentFrame,
+    this.port.postMessage({telemetry:true,sequence:++this.sequence,meters:this.meter.report(this.core),playing:this.playing,frame:this.core.frame,contextFrame:currentFrame,
       states:this.core.states,active:this.core.active(),stats:this.core.stats,warnings:[...this.core.warnings]});
   }
   process(inputs,outputs) {
@@ -44,7 +52,9 @@ class B236PCMProcessor extends AudioWorkletProcessor {
         this.playing=false;this.port.postMessage({ended:true});this.report();
       }
     }
-    if(++this.blocks%16===0)this.report();
+    // ~60 Hz telemetry, independent of quantum length and context sample rate.
+    this.meterFrames+=out[0].length;
+    if(this.meterFrames>=sampleRate/60){this.meterFrames%=sampleRate/60;this.report();}
     return true;
   }
 }
