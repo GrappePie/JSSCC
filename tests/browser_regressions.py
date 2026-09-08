@@ -22,6 +22,7 @@ def record(name, value, details=None):
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium') or shutil.which('chromium-browser'), headless=True, args=['--no-sandbox'])
     page=browser.new_page(viewport={'width':1100,'height':850})
+    page.add_init_script("window.JSSCC_DEFAULT_ENGINE='legacy'")
     errors=[]
     page.on('pageerror',lambda e:errors.append(str(e)))
     console=[]
@@ -36,6 +37,7 @@ with sync_playwright() as p:
         html=re.sub(r'<script.*?</script>','',html,flags=re.S)
         html=re.sub(r'<link[^>]*>','',html)
         page.set_content(html)
+        page.evaluate("window.JSSCC_DEFAULT_ENGINE='legacy'")
         for style in styles: page.add_style_tag(content=(ROOT/style.split('?')[0]).read_text())
         assets={}
         for f in (ROOT/'assets').rglob('*'):

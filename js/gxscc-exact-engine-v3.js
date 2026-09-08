@@ -6,7 +6,12 @@
   if (!D || !A || !P) throw new Error('JSSCC: data, parser or audio module missing');
   let midi = null, context = null, synth = null, transport = null, instrumentSet = 0;
   let requestId = 0, lastUiState = 0, pending = 0, exporting = false;
-  let picker, status, seekBar, controls, gainInput;
+  let picker, status, seekBar, controls, gainInput, versionLabel, engineSelect;
+  let engineMode = window.JSSCC_DEFAULT_ENGINE === 'legacy' ? 'legacy' : 'pcm';
+  let initializing = null, pcmDuration = null;
+  const selectedAudio = () => engineMode === 'pcm' ? window.JSSCCPCMBridge : A;
+  const duration = () => midi ? (engineMode === 'pcm' ? (pcmDuration ?? midi.duration) : midi.duration) : 0;
+  const version = () => engineMode === 'pcm' ? JSSCCPCM.VERSION : A.VERSION;
   const muted = Array(32).fill(false);
   const getUi = () => window.ui || null;
   const stateNumber = s => ({stopped: 0, paused: 1, playing: 2}[s]);
@@ -17,20 +22,44 @@
   function setUiState(n) {
     lastUiState = n; const u = getUi(); if (u && u.song) u.song.playState = n;
   }
-  function ensureAudio() {
+  async function ensureAudio() {
     if (transport) return;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) throw new Error('Este navegador no admite Web Audio');
-    if (!context) context = new AC({sampleRate: 44100});
-    synth = new A.Synth(context, D, {instrumentSet, masterGain: Number(gainInput.value)});
-    muted.forEach((m, c) => synth.mute(c, m));
-    transport = new A.Transport(context, synth, midi);
+    if (initializing) return initializing;
+    const mode=engineMode, loaded=midi;
+    initializing=(async()=>{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) throw new Error('Este navegador no admite Web Audio');
+      if (!context) context = new AC({sampleRate: 44100});
+      if (mode === 'pcm') await JSSCCPCMBridge.prepare(context);
+      if (loaded !== midi || mode !== engineMode) return;
+      synth = mode === 'pcm' ? new JSSCCPCMBridge.Synth(context,D,loaded,{instrumentSet,masterGain:Number(gainInput.value)}) :
+        new A.Synth(context,D,{instrumentSet,masterGain:Number(gainInput.value)});
+      muted.forEach((m,c)=>synth.mute(c,m));
+      const EngineTransport = mode === 'pcm' ? JSSCCPCMBridge.Transport : A.Transport;
+      transport = new EngineTransport(context,synth,loaded);
+    })().finally(()=>{initializing=null;});
+    return initializing;
+  }
+  async function setEngine(value) {
+    if (!['pcm','legacy'].includes(value)) throw new Error('Motor inválido');
+    if (value === engineMode) return;
+    pending++;
+    try {
+      if (initializing) await initializing;
+      if (transport) await transport.stop();
+      if (synth) synth.dispose();
+      transport=null;synth=null;engineMode=value;setUiState(0);
+      engineSelect.value=value;versionLabel.textContent='Experimental · '+version()+' · equivalencia completa no validada';
+      if (midi) { seekBar.value=0; seekBar.dataset.last='0'; const u=getUi(); if(u&&u.song)u.song.position=0; }
+      message(value==='pcm'?'PCM B236E: oscilador y mezcla enteros; reloj y controladores compatibles. Ruido y casos especiales aún experimentales.':'Motor Web Audio anterior seleccionado.');
+    } finally {pending--;}
   }
   async function request(action, value) {
     if (!midi) { message('Carga primero un archivo .mid o .midi'); setUiState(0); return false; }
     pending++;
     try {
-      ensureAudio();
+      await ensureAudio();
+      if (!transport) return false;
       const u = getUi(); transport.repeat = !!(u && u.song.repeat);
       if (action === 'play') { setUiState(2); await transport.play(); }
       if (action === 'pause') { setUiState(1); await transport.pause(); }
@@ -49,14 +78,16 @@
     try {
       const parsed = P.parseMidi(await file.arrayBuffer(), file.name);
       if (!parsed.events.some(e => e.type === 'on')) throw new Error('El archivo no contiene notas');
+      const compiledDuration=JSSCCPCM.compile(parsed).duration;
       if (id !== requestId) return false;
+      if (initializing) await initializing;
       if (transport) await transport.stop();
       if (id !== requestId) return false;
       if (synth) synth.dispose(); synth = null; transport = null;
-      midi = parsed; setUiState(0);
+      midi = parsed; pcmDuration = compiledDuration; setUiState(0);
       const u = getUi();
       if (u && u.song) { u.song.fileName = parsed.fileName; u.song.position = 0; }
-      seekBar.value = 0;
+      seekBar.value = 0; seekBar.dataset.last = '0';
       const note = parsed.warnings.length ? ' · Avisos: ' + parsed.warnings.join('; ') : '';
       message('Cargado: ' + parsed.fileName + ' · ' + parsed.trackCount + ' pistas' + note);
       return true;
@@ -68,12 +99,12 @@
   async function exportWav() {
     if (!midi || exporting) return false;
     exporting = true;
-    const loaded = midi, selected = instrumentSet, gain = Number(gainInput.value);
+    const loaded = midi, selected = instrumentSet, gain = Number(gainInput.value), renderer=selectedAudio();
     const button = document.getElementById('jsscc-export'); button.disabled = true;
     try {
       message('Generando WAV con el motor web experimental…');
-      const buffer = await A.renderMidi(loaded, D, {sampleRate: 44100, instrumentSet: selected, masterGain: gain, muted: muted.flatMap((m, i) => m ? [i] : [])});
-      const blob = new Blob([A.wav(buffer)], {type: 'audio/wav'}), url = URL.createObjectURL(blob);
+      const buffer = await renderer.renderMidi(loaded, D, {sampleRate: 44100, instrumentSet: selected, masterGain: gain, muted: muted.flatMap((m, i) => m ? [i] : [])});
+      const blob = new Blob([renderer.wav(buffer)], {type: 'audio/wav'}), url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url;
       link.download = loaded.fileName.replace(/\.(mid|midi)$/i, '') + '-web.wav';
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -101,11 +132,11 @@
     if (transport) {
       transport.repeat = !!u.song.repeat;
       const external = u.song.position || 0;
-      if (!pending && midi.duration && Math.abs(external - Number(seekBar.dataset.last || 0)) > 0.002) {
-        request('seek', external * midi.duration);
+      if (!pending && duration() && Math.abs(external - Number(seekBar.dataset.last || 0)) > 0.002) {
+        request('seek', external * duration());
       }
       transport.tick();
-      const p = Math.min(1, transport.position / Math.max(0.001, midi.duration));
+      const p = Math.min(1, transport.position / Math.max(0.001, duration()));
       if (document.activeElement !== seekBar) seekBar.value = String(p);
       u.song.position = p; seekBar.dataset.last = String(p);
       if (!pending) setUiState(stateNumber(transport.state));
@@ -145,6 +176,9 @@
     const select = document.createElement('select'); select.id = 'jsscc-set'; select.setAttribute('aria-label', 'Banco de instrumentos');
     D.instrumentSets.forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.name; select.appendChild(o); });
     select.onchange = () => instrument(Number(select.value)); row.appendChild(select);
+    engineSelect=document.createElement('select');engineSelect.id='jsscc-engine';engineSelect.setAttribute('aria-label','Motor de audio');
+    for(const [value,text] of [['pcm','PCM B236E · experimental'],['legacy','Anterior · Web Audio']]){const o=document.createElement('option');o.value=value;o.textContent=text;engineSelect.appendChild(o);}
+    engineSelect.value=engineMode;engineSelect.onchange=()=>setEngine(engineSelect.value).catch(e=>message(e.message,true));row.appendChild(engineSelect);
     const label = document.createElement('label'); label.textContent = 'Nivel de salida ';
     gainInput = document.createElement('input'); gainInput.id = 'jsscc-gain'; gainInput.type = 'range';
     gainInput.min = '0'; gainInput.max = '0.5'; gainInput.step = '.01'; gainInput.value = '.25';
@@ -152,9 +186,9 @@
     label.appendChild(gainInput); row.appendChild(label);
     seekBar = document.createElement('input'); seekBar.type = 'range'; seekBar.min = '0'; seekBar.max = '1'; seekBar.step = '.0001'; seekBar.value = '0';
     seekBar.id = 'jsscc-seek'; seekBar.setAttribute('aria-label', 'Posición de reproducción');
-    seekBar.onchange = () => { if (midi) request('seek', Number(seekBar.value) * midi.duration); }; controls.appendChild(seekBar);
+    seekBar.onchange = () => { if (midi) request('seek', Number(seekBar.value) * duration()); }; controls.appendChild(seekBar);
     status = document.createElement('p'); status.id = 'jsscc-status'; status.setAttribute('role', 'status'); controls.appendChild(status);
-    const version = document.createElement('small'); version.textContent = 'Experimental · ' + A.VERSION + ' · equivalencia con GXSCC aún no validada'; controls.appendChild(version);
+    versionLabel = document.createElement('small'); versionLabel.textContent = 'Experimental · ' + version() + ' · equivalencia completa con GXSCC aún no validada'; controls.appendChild(versionLabel);
     document.body.appendChild(controls);
     const overlay = document.createElement('div'); overlay.id = 'jsscc-drop'; overlay.textContent = 'SUELTA EL MIDI AQUÍ'; document.body.appendChild(overlay);
     let depth = 0;
@@ -193,13 +227,15 @@
   window.JSSCCMidi = {
     loadFile, parseMidi: P.parseMidi, play: () => request('play'), pause: () => request('pause'),
     stop: () => request('stop'), seek: value => request('seek', value), exportWav,
-    render: options => { if (!midi) throw new Error('No MIDI loaded'); return A.renderMidi(midi, D, {instrumentSet, ...options}); },
+    render: options => { if (!midi) throw new Error('No MIDI loaded'); return selectedAudio().renderMidi(midi, D, {instrumentSet, ...options}); },
+    setEngine, get engine() {return engineMode;},
     get current() { return midi; }, get exactData() { return D; },
     get instrumentSet() { return instrumentSet; }, set instrumentSet(v) { instrument(v); },
-    diagnostics: () => ({version: A.VERSION, state: transport ? transport.state : 'stopped',
+    diagnostics: () => ({version: version(), engine: engineMode, duration: duration(), state: transport ? transport.state : 'stopped',
       position: transport ? transport.position : 0, contextState: context ? context.state : 'not-created',
       activeVoices: synth ? synth.active().length : 0, originalAudioCompared: true, originalAudioEquivalent: false,
-      comparisonScope: '3 baseline + 26 isolated follow-up cases; not full fidelity',
+      comparisonScope: '128 programs x 8 banks,45 pitch/velocity probes,mixer/control/clock cases; not full equivalence',
+      pcmStats: synth && synth.stats || null,
       warnings: [...(midi ? midi.warnings : []), ...(synth ? synth.warnings : [])]})
   };
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', setup, {once: true}); else setup();

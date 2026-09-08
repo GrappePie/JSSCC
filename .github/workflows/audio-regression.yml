@@ -1,7 +1,8 @@
 name: Audio regression checks
 on:
   push:
-    branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908]
+    branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908]
+    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', '.github/workflows/audio-regression.yml']
   pull_request:
     branches: [github-pages]
   workflow_dispatch:
@@ -28,21 +29,29 @@ jobs:
         run: |
           mkdir -p test-results
           git rev-parse HEAD > test-results/commit.txt
-          git archive --format=zip HEAD js/midi-core.js js/audio-core.js js/gxscc-exact-data.js js/gxscc-exact-engine-v3.js css/player-controls.css index.html tests tools docs .github/workflows/audio-regression.yml > test-results/tested-source.zip
+          git archive --format=zip HEAD js css/player-controls.css index.html tests tools docs .github/workflows/audio-regression.yml > test-results/tested-source.zip
       - name: Run required Node regression suite
         run: node --test tests/regressions.cjs | tee test-results/node-tests.txt
+      - name: Test integer PCM kernel, 992 native prefixes and state-conditioned chords
+        run: node --test tests/pcm-regressions.cjs tests/pcm-polyphony.cjs | tee test-results/pcm-node-tests.txt
       - name: Install pinned browser test dependencies
-        run: python -m pip install playwright==1.55.0 numpy==2.2.6
+        # Playwright 1.55 stalls AudioWorklet targets (microsoft/playwright#37592).
+        run: python -m pip install playwright==1.56.0 numpy==2.2.6
       - name: Install Chromium for end-to-end tests
         run: python -m playwright install --with-deps chromium
       - name: Generate original synthetic MIDI corpus
         run: node tools/generate_corpus.cjs test-results/corpus
       - name: Test comparison tool on synthetic WAVs
         run: python tools/compare_wavs.py --self-test --output test-results/comparison-self-test.json
-      - name: Test the full HTTP site and real Web Audio
-        run: python tests/browser_regressions.py test-results | tee test-results/browser-tests.log
+      - name: Test the full HTTP site with real native silent-sink audio
+        if: ${{ !cancelled() }}
+        run: python tests/run_silent_audio_ci.py browser_regressions.py test-results | tee test-results/browser-tests.log
       - name: Test decoded envelopes and reference audio
+        if: ${{ !cancelled() }}
         run: python tests/reference_audio_regressions.py test-results | tee test-results/reference-audio-tests.log
+      - name: Test PCM AudioWorklet and full HTTP UI with real native silent-sink audio
+        if: ${{ !cancelled() }}
+        run: python tests/run_silent_audio_ci.py pcm_browser.py test-results | tee test-results/pcm-browser-tests.log
       - name: Preserve validation evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,0 +1,27 @@
+name: Worklet module isolation
+on:
+  push:
+    branches: [fix/pcm-matrix-20260908]
+    paths: [tests/worklet_isolation.py, .github/workflows/worklet-isolation.yml]
+permissions:
+  contents: read
+jobs:
+  isolate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright==1.56.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/worklet_isolation.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: worklet-module-isolation
+          path: isolation-evidence/
+          retention-days: 7
