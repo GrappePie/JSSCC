@@ -2,6 +2,7 @@ name: Audio regression checks
 on:
   push:
     branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908]
+    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', '.github/workflows/audio-regression.yml']
   pull_request:
     branches: [github-pages]
   workflow_dispatch:
@@ -37,6 +38,13 @@ jobs:
         run: python -m pip install playwright==1.55.0 numpy==2.2.6
       - name: Install Chromium for end-to-end tests
         run: python -m playwright install --with-deps chromium
+      - name: Provide a virtual audio output for the real browser audio thread
+        run: |
+          sudo apt-get install --no-install-recommends -y pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=jsscc_ci rate=44100 channels=2
+          pactl set-default-sink jsscc_ci
+          pactl info | tee test-results/audio-device.txt
       - name: Generate original synthetic MIDI corpus
         run: node tools/generate_corpus.cjs test-results/corpus
       - name: Test comparison tool on synthetic WAVs
