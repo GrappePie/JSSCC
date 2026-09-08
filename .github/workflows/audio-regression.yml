@@ -1,8 +1,8 @@
 name: Audio regression checks
 on:
   push:
-    branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908, fix/live-ui-20260908, feat/pcm-edition-sequencer-20260908, fix/panel-startup-20260908]
-    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
+    branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908, fix/live-ui-20260908, feat/pcm-edition-sequencer-20260908, fix/panel-startup-20260908, feat/direct-sequence-play-20260908]
+    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'tests/sequence*', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
   pull_request:
     branches: [github-pages]
   workflow_dispatch:
@@ -40,6 +40,8 @@ jobs:
         run: node --test tests/edition-regressions.cjs | tee test-results/edition-node-tests.txt
       - name: Test renderer bootstrap ordering
         run: node --test tests/startup-regressions.cjs | tee test-results/startup-node-tests.txt
+      - name: Test bounded automatic sequence import
+        run: node --test tests/sequence-regressions.cjs | tee test-results/sequence-node-tests.txt
       - name: Install pinned browser test dependencies
         # Playwright 1.55 stalls AudioWorklet targets (microsoft/playwright#37592).
         run: python -m pip install playwright==1.56.0 numpy==2.2.6
@@ -67,6 +69,9 @@ jobs:
       - name: Test assets finishing before window load
         if: ${{ !cancelled() }}
         run: python tests/startup_browser.py test-results | tee test-results/startup-browser-tests.log
+      - name: Test automatic sequence playback without a file dialog
+        if: ${{ !cancelled() }}
+        run: python tests/sequence_browser.py test-results | tee test-results/sequence-browser-tests.log
       - name: Preserve validation evidence
         if: always()
         uses: actions/upload-artifact@v4

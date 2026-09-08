@@ -1,6 +1,6 @@
 # JSSCC — PCM Edition
 
-**v0.1.0 · Experimental · maintained by GrappePie**
+**v0.2.0 · Experimental · maintained by GrappePie**
 
 A browser MIDI-to-chiptune player derived from JSSCC, with an independently written experimental integer PCM engine informed by measurements of Gashisoft GXSCC B236E. This is not an official Gashisoft release, nor a claim of complete emulation.
 
@@ -12,20 +12,24 @@ Drop a `.mid`/`.midi` file or choose **Cargar MIDI**, then press Play. The brows
 
 The retro UI has live voice-count colors, envelope/output readings and timing fields. BUFFER WEB reports observed audio-heartbeat continuity, not the original Windows queue occupancy.
 
-## Online Sequencer reference library — first stage
+## Online Sequencer: click and play
 
-The **OS / Online Sequencer** button opens a palette-matched horizontal card library. The bundled entries are selected links checked on 2026-09-08, **not a live feed**. Filter by title/author, add an Online Sequencer URL/ID, open a song on its official page, and associate a locally exported MIDI to play it through PCM Edition. The selected MIDI is kept only in RAM for this session (32 MiB total); only user-added link metadata is saved locally.
+Press **OS / Online Sequencer**, then **Escuchar chiptune** on a card. Public sequence data is downloaded into memory through our bounded JSSCC Sequence Bridge, independently converted from protobuf to Standard MIDI in a Web Worker, and automatically synthesized by the existing player. The primary action never opens a file picker or saves a download. Importing a local MIDI is a separate secondary option. Cancelling or closing the drawer cancels pending playback. Conversion warnings remain visible beside the source link.
 
-Automatic cross-origin catalog/sequence loading is **not implemented**. The catalog and sequence-data responses inspected on 2026-09-08 did not include an Access-Control-Allow-Origin header for this page. We do not use an open proxy, scraped song archive, external credentials or background polling. An approved API/CORS arrangement or agreed server adapter is the next step. There is no official partnership. Remote thumbnails are opt-in. The OS badge is a locally styled label, not their official logo.
+The bundled cards remain selected links checked on 2026-09-08, **not a live catalog**. Title/author metadata is from that selection or supplied by the user; arbitrary added URLs are not automatically given verified metadata. There is no official partnership or endorsement.
 
-See [integration scope and evidence](docs/ONLINE_SEQUENCER_INTEGRATION.md).
+On-demand backend: `https://jsscc-sequence-bridge.lovable.app/api/public/sequence-bridge`. Only numerical Online Sequencer IDs are accepted, never arbitrary URLs. The auxiliary service is hosted in the owner's connected Lovable workspace, using its included resources; hosting has usage limits, not unlimited free availability. There is no account/login requirement in the player. Song bytes are not stored in localStorage, committed to this repository, or placed in downloads; short-lived caches exist in memory. Opening the library alone never requests song data. Remote thumbnails remain opt-in.
+
+Supported conversion: note pitch/time/duration, mapped instruments, two MIDI ports, tempo, basic volume/pan, and sampled transitions. Not all Online Sequencer effects, custom synths, stacked sounds or continuous detuning are retained. Unavailable, malformed, oversized and excessively complex sequences return a visible error instead of a fake success or a silent switch to a file picker.
+
+See [integration architecture, limits and deployment](docs/ONLINE_SEQUENCER_INTEGRATION.md).
 
 ## Development and verification
 
-Serve this directory over HTTP (for example `python -m http.server 8000`) and visit localhost. AudioWorklet requires a supported secure context (HTTPS or localhost). No production backend is required for the current functionality.
+Serve this directory over HTTP (for example `python -m http.server 8000`) and visit localhost. AudioWorklet requires a supported secure context (HTTPS or localhost). Local MIDI playback does not need a backend. Automatic sequence retrieval requires the separately deployed bridge.
 
 ```sh
-node --test tests/regressions.cjs tests/pcm-regressions.cjs tests/pcm-polyphony.cjs tests/ui-meters.cjs tests/edition-regressions.cjs
+node --test tests/regressions.cjs tests/pcm-regressions.cjs tests/pcm-polyphony.cjs tests/ui-meters.cjs tests/edition-regressions.cjs tests/sequence-regressions.cjs
 ```
 
 GitHub Actions also exercises the real HTTP player, native Chromium AudioWorklet, WAV exports, actual canvas pixels and the reference-library flow. Test outcomes apply to the cases covered, not to all devices or all music.

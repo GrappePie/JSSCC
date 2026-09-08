@@ -9,10 +9,12 @@
     const controls=document.querySelector('.jsscc-control-row');if(!controls)return;
     let storage;try{storage=window.localStorage;}catch(_){storage=null;}
     let saved=L.readSaved(storage),selection=[],loading=null,thumbnails=false,selectedId=null,busy=false,creditSeq=null;
+    const remote=new window.JSSCCSequenceRemote.Importer();
+    let remoteController=null,remoteId=null,remoteSerial=0,remoteReport=null;
     const midiFiles=new Map();let usedBytes=0;const MAX_BYTES=32*1024*1024;
     const open=el('button','edition-launch');open.type='button';open.id='jsscc-sequencer';
     open.append(el('span','edition-os-badge','OS'),el('span','', 'Online Sequencer'));
-    open.title='Enlaces a Online Sequencer e importación local de MIDI. No es una colaboración oficial.';
+    open.title='Escucha secuencias de Online Sequencer en chiptune con un clic. Integración no oficial.';
     open.setAttribute('aria-haspopup','dialog');controls.append(open);
     const creditLink=link('Créditos y licencias','./credits.html');creditLink.classList.add('edition-credits');controls.append(creditLink);
     const product=el('span','edition-product',E.name+' · v'+E.version+' · '+E.status);product.id='jsscc-edition';
@@ -22,7 +24,7 @@
     const head=el('header','edition-drawer-head');const titleBlock=el('div');titleBlock.append(el('p','edition-eyebrow','EXPLORAR · ENLAZAR · ESCUCHAR'));
     const title=el('h2','', 'Online Sequencer');title.id='edition-gallery-title';titleBlock.append(title,el('p','edition-subtitle','Tu biblioteca de enlaces, con el sonido de PCM Edition.'));
     const close=el('button','edition-close','×');close.type='button';close.setAttribute('aria-label','Cerrar biblioteca');close.onclick=()=>drawer.close();head.append(titleBlock,close);drawer.append(head);
-    const notice=el('p','edition-notice','Integración independiente, no oficial. Selección de enlaces del 08 sep 2026; no es un catálogo en directo. Para escuchar aquí, exporta el MIDI en la página original y cárgalo en su tarjeta.');notice.id='edition-network-note';drawer.append(notice);
+    const notice=el('p','edition-notice','Integración independiente, no oficial. Selección de enlaces del 08 sep 2026; no es un catálogo en directo. Pulsa Escuchar chiptune: se obtiene la secuencia con nuestro servicio auxiliar y se convierte en memoria. No se guarda en tu carpeta de descargas.');notice.id='edition-network-note';drawer.append(notice);
     const nav=el('div','edition-nav');const search=el('input');search.type='search';search.placeholder='Filtrar título o autor de estos enlaces';search.setAttribute('aria-label','Filtrar enlaces guardados');search.id='edition-search';
     nav.append(search,link('Explorar catálogo oficial ↗',L.ORIGIN+'/sequences'));drawer.append(nav);
     const railRow=el('div','edition-rail-row');const prev=el('button','edition-arrow','‹'),next=el('button','edition-arrow','›');
@@ -30,24 +32,71 @@
     const rail=el('div','edition-rail');rail.id='edition-sequence-cards';rail.setAttribute('role','region');rail.setAttribute('aria-label','Canciones enlazadas');rail.tabIndex=0;
     function slide(dir){rail.scrollBy({left:dir*Math.max(280,rail.clientWidth*.85),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
     prev.onclick=()=>slide(-1);next.onclick=()=>slide(1);railRow.append(prev,rail,next);drawer.append(railRow);
+    const cancel=el('button','edition-cancel','Cancelar carga');cancel.type='button';cancel.id='edition-cancel-load';cancel.hidden=true;drawer.append(cancel);
     const feedback=el('p','edition-feedback');feedback.id='edition-feedback';feedback.setAttribute('role','status');drawer.append(feedback);
     const form=el('form','edition-add-form');form.append(el('label','', 'Añadir otro enlace'));
     const urlInput=el('input');urlInput.id='edition-sequence-url';urlInput.placeholder='https://onlinesequencer.net/1234567';urlInput.required=true;urlInput.maxLength=2048;urlInput.setAttribute('aria-label','Enlace o ID de Online Sequencer');
     const add=el('button','', 'Añadir');add.type='submit';form.append(urlInput,add);drawer.append(form);
     const options=el('div','edition-options');const thumbLabel=el('label');const thumb=el('input');thumb.type='checkbox';thumb.id='edition-thumbnails';
     thumbLabel.append(thumb,document.createTextNode('Cargar miniaturas externas (conecta con Online Sequencer)'));options.append(thumbLabel);drawer.append(options);
-    const help=el('details','edition-help');help.append(el('summary','', 'Cómo funciona la reproducción y qué falta para conectar el catálogo'));
-    help.append(el('p','', 'Abre la canción original → Export MIDI → Cargar MIDI y escuchar. El archivo se sintetiza aquí; no se reproduce una grabación de Online Sequencer. La asociación entre el enlace y el archivo la eliges tú, no se verifica automáticamente.'));
-    help.append(el('p','', 'Los MIDI asociados se conservan solo durante esta sesión (máximo 32 MiB en conjunto). Se guardan únicamente tus enlaces en este navegador; no se suben los archivos. Usa música propia o con los permisos necesarios.'));
-    help.append(el('p','', 'La carga automática del catálogo y de las canciones está pendiente: las respuestas comprobadas no habilitan CORS para nuestra página. No usamos proxies públicos, credenciales ni descargas masivas. Una API habilitada o un servicio acordado con Online Sequencer permitiría completar el flujo de un clic.'));
+    const help=el('details','edition-help');help.append(el('summary','', 'Cómo funciona la reproducción directa y sus límites'));
+    help.append(el('p','', 'Escuchar chiptune obtiene las notas y tiempos mediante JSSCC Sequence Bridge (alojado en Lovable), los convierte en MIDI en memoria y los reproduce con el motor seleccionado. No se descarga una grabación: el sonido lo genera JSSCC. Efectos y sintetizadores especiales se reinterpretan; los avisos de conversión aparecen junto a la canción.'));
+    help.append(el('p','', 'La conversión se conserva temporalmente en memoria (hasta 5 minutos, máximo 8 canciones y 32 MiB). El servicio auxiliar tiene caché temporal de 5 minutos y recibe tu dirección IP para limitar solicitudes. No enviamos cookies ni archivos locales. Importar MIDI local sigue disponible como opción independiente. Usa música propia o con los permisos necesarios.'));
+    help.append(el('p','', 'El catálogo sigue siendo una selección de enlaces, no un listado en directo. La carga individual usa un servicio propio limitado a IDs de Online Sequencer, no un proxy de URLs arbitrarias. No hay descarga anticipada al abrir la biblioteca, ni reintentos masivos. Una canción privada, eliminada o de formato no compatible puede no reproducirse.'));
     help.append(el('p','', 'El distintivo OS es una etiqueta propia de acceso, no su logotipo oficial ni un sello de colaboración. Las miniaturas opcionales se muestran desde su sitio sin copiarlas al repositorio.'));
     help.append(link('Privacidad de Online Sequencer ↗',L.ORIGIN+'/privacy'));drawer.append(help);
     const fileInput=el('input');fileInput.type='file';fileInput.accept='.mid,.midi';fileInput.hidden=true;fileInput.id='edition-midi-file';drawer.append(fileInput);document.body.append(drawer);
     function tell(message,bad=false){feedback.textContent=message;feedback.dataset.error=String(bad);}
     function all(){const map=new Map(selection.map(x=>[x.id,x]));for(const x of saved)map.set(x.id,x);return [...map.values()];}
     function showSource(item,file){creditSeq=window.JSSCCMidi.current;source.replaceChildren(document.createTextNode('Referencia elegida: '),link(item.title+' · '+item.author,item.url),document.createTextNode(' | MIDI local: '+file.name+' (asociación elegida por ti)'));source.hidden=false;window.dispatchEvent(new Event('resize'));}
+    function cancelRemote(message='Carga cancelada.') {
+      if(!remoteController)return;
+      remoteSerial++;remoteController.abort();remoteController=null;remoteId=null;cancel.hidden=true;
+      if(message)tell(message);render();
+    }
+    cancel.onclick=()=>cancelRemote();
+    drawer.addEventListener('close',()=>cancelRemote(''));
+    window.addEventListener('jsscc-player-action',e=>{
+      if(e.detail?.owner!=='sequence-remote')cancelRemote('Carga cancelada por otro control del reproductor.');
+    });
+    function showRemoteSource(item,report){
+      creditSeq=window.JSSCCMidi.current;remoteReport=report;
+      source.replaceChildren(document.createTextNode('Secuencia online: '),link(item.title+' · '+item.author,item.url),
+        document.createTextNode(' | Convertida en memoria · '+report.noteCount+' notas · reinterpretación chiptune'));
+      if(report.warnings.length){const details=el('details','edition-conversion-warnings');details.append(el('summary','',report.warnings.length+' avisos de conversión'));for(const w of report.warnings)details.append(el('p','',w));source.append(details);}
+      source.hidden=false;window.dispatchEvent(new Event('resize'));
+    }
+    async function playRemote(item){
+      if(busy)return false;
+      cancelRemote('');const serial=++remoteSerial,controller=new AbortController();
+      remoteController=controller;remoteId=item.id;cancel.hidden=false;render();
+      tell('Obteniendo '+item.title+'…');
+      try {
+        const player=window.JSSCCMidi;if(!player)throw Error('El reproductor aún no está listo');
+        // Called during this genuine click, before network/worker awaits.
+        await player.unlockAudio();
+        const result=await remote.get(item,{signal:controller.signal,onProgress:(stage,bytes)=>{
+          if(serial!==remoteSerial)return;
+          tell(stage==='convert'?'Convirtiendo notas a chiptune…':stage==='cache'?'Cargando conversión de memoria…':'Obteniendo secuencia… '+Math.ceil(bytes/1024)+' KiB');
+        }});
+        if(controller.signal.aborted||serial!==remoteSerial)return false;
+        const name=(item.title||'Online Sequencer').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').slice(0,100)+'-os'+item.id+'.mid';
+        const file=new File([result.bytes],name,{type:'audio/midi'});
+        if(!await player.loadFile(file,{owner:'sequence-remote',signal:controller.signal}))throw Error('No se pudo cargar la secuencia convertida');
+        if(controller.signal.aborted||serial!==remoteSerial)return false;
+        showRemoteSource(item,result.report);
+        const played=await player.play({owner:'sequence-remote'});
+        if(controller.signal.aborted||serial!==remoteSerial)return false;
+        if(!played)throw Error('Secuencia cargada; pulsa Reproducir para habilitar el audio de tu navegador.');
+        tell('Reproduciendo '+item.title+' · '+result.report.noteCount+' notas.');
+        remoteController=null;remoteId=null;cancel.hidden=true;drawer.close();return true;
+      } catch(e) {
+        if(serial===remoteSerial)tell(e.name==='AbortError'?'Carga cancelada.':e.message,e.name!=='AbortError');
+        return false;
+      } finally {if(serial===remoteSerial){remoteController=null;remoteId=null;cancel.hidden=true;render();}}
+    }
     async function playItem(item,file){
-      if(busy)return false;busy=true;render();tell('Cargando MIDI local con el motor seleccionado…');
+      if(busy)return false;cancelRemote('');busy=true;render();tell('Cargando MIDI local con el motor seleccionado…');
       try{
         const player=window.JSSCCMidi;
         if(!player||!await player.loadFile(file))throw new Error('No se pudo leer el MIDI. La canción anterior no se reemplaza por un archivo inválido.');
@@ -67,11 +116,14 @@
         const art=el('div','edition-art');art.append(el('span','edition-art-label',String(item.id)),el('span','edition-art-os','OS'));
         if(thumbnails&&item.thumbnail){const img=el('img');img.src=item.thumbnail;img.alt='Miniatura de '+item.title;img.loading='lazy';img.referrerPolicy='no-referrer';img.onerror=()=>img.remove();art.append(img);}
         const h=el('h3','',item.title);h.title=item.title;
-        card.append(art,el('span','edition-tag',file?'MIDI LOCAL ASOCIADO':'ENLACE · REQUIERE MIDI'),h,el('p','edition-author','Por '+item.author),el('p','edition-duration',item.duration?'Duración publicada: '+item.duration:'ID '+item.id));
+        card.append(art,el('span','edition-tag',file?'MIDI LOCAL DISPONIBLE':'ESCUCHA DIRECTA · CHIPTUNE'),h,el('p','edition-author','Por '+item.author),el('p','edition-duration',item.duration?'Duración publicada: '+item.duration:'ID '+item.id));
         card.append(link('Abrir original ↗',item.url));
-        const play=el('button','edition-play',file?'▶ Reproducir chiptune':'Cargar MIDI y escuchar');play.type='button';play.disabled=busy;
-        play.onclick=()=>{if(file)playItem(item,file);else{selectedId=item.id;fileInput.value='';fileInput.click();}};card.append(play);
+        const play=el('button','edition-play',remoteId===item.id?'Cargando…':'▶ Escuchar chiptune');play.type='button';play.disabled=busy||remoteId===item.id;
+        play.onclick=()=>playRemote(item);card.append(play);
+        const local=el('button','edition-import','Importar MIDI local');local.type='button';local.disabled=busy;
+        local.onclick=()=>{cancelRemote('');selectedId=item.id;fileInput.value='';fileInput.click();};card.append(local);
         if(file){
+          const replay=el('button','edition-replay','▶ Reproducir chiptune local');replay.type='button';replay.disabled=busy;replay.onclick=()=>playItem(item,file);card.append(replay);
           const detail=el('p','edition-file',file.name+' · solo esta sesión');card.append(detail);
           const unlink=el('button','edition-minor','Quitar MIDI');unlink.type='button';unlink.disabled=busy;unlink.onclick=()=>{usedBytes-=file.size;midiFiles.delete(item.id);render();};card.append(unlink);
         }
@@ -128,7 +180,7 @@
     // Only small metadata checks; no second audio/animation loop.
     setInterval(()=>{syncPalette();if(creditSeq&&creditSeq!==window.JSSCCMidi?.current){source.hidden=true;creditSeq=null;window.dispatchEvent(new Event('resize'));}},250);
     syncPalette();window.dispatchEvent(new Event('resize'));
-    window.JSSCCEditionUI={openLibrary:()=>open.click(),diagnostics:()=>({version:E.version,brandingReady:repoHooked,liveCatalog:false,officialPartnership:false,links:all().length,associatedFiles:midiFiles.size,associatedBytes:usedBytes,remoteThumbnails:thumbnails})};
+    window.JSSCCEditionUI={openLibrary:()=>open.click(),diagnostics:()=>({version:E.version,brandingReady:repoHooked,liveCatalog:false,officialPartnership:false,links:all().length,associatedFiles:midiFiles.size,associatedBytes:usedBytes,remoteThumbnails:thumbnails,remotePlayback:true,remoteLoading:remoteId,remote:remote.diagnostics(),lastConversion:remoteReport})};
   }
   // Match the player's window-level DOMContentLoaded listener so its controls exist first.
   if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',setup,{once:true});else setup();

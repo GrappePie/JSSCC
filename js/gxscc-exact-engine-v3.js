@@ -42,7 +42,20 @@
     })().finally(()=>{initializing=null;});
     return initializing;
   }
+  function announceAction(action, owner) {
+    window.dispatchEvent(new CustomEvent('jsscc-player-action', {detail:{action, owner:owner || 'player'}}));
+  }
+  function unlockAudio() {
+    const AC=window.AudioContext || window.webkitAudioContext;
+    if(!AC) return Promise.reject(new Error('Este navegador no admite Web Audio'));
+    if(!context || context.state==='closed') context=new AC({sampleRate:44100});
+    // Previously played contexts are already gesture-authorized; do not unpause
+    // the old song merely while a different sequence is downloading.
+    if(transport && transport.state==='paused') return Promise.resolve();
+    return context.resume();
+  }
   async function setEngine(value) {
+    announceAction('engine');
     if (!['pcm','legacy'].includes(value)) throw new Error('Motor inválido');
     if (value === engineMode) return;
     pending++;
@@ -56,7 +69,8 @@
       message(value==='pcm'?'PCM B236E: oscilador y mezcla enteros; reloj y controladores compatibles. Ruido y casos especiales aún experimentales.':'Motor Web Audio anterior seleccionado.');
     } finally {pending--;}
   }
-  async function request(action, value) {
+  async function request(action, value, options = {}) {
+    announceAction(action, options.owner);
     if (!midi) { message('Carga primero un archivo .mid o .midi'); setUiState(0); return false; }
     pending++;
     try {
@@ -73,7 +87,8 @@
       message(error.message, true); console.error(error); return false;
     } finally { pending--; }
   }
-  async function loadFile(file) {
+  async function loadFile(file, options = {}) {
+    announceAction('load', options.owner);
     const id = ++requestId;
     if (!file || !/\.(mid|midi)$/i.test(file.name)) { message('Selecciona un archivo .mid o .midi', true); return false; }
     if (file.size > 16 * 1024 * 1024) { message('El MIDI supera 16 MiB', true); return false; }
@@ -81,10 +96,10 @@
       const parsed = P.parseMidi(await file.arrayBuffer(), file.name);
       if (!parsed.events.some(e => e.type === 'on')) throw new Error('El archivo no contiene notas');
       const compiledDuration=JSSCCPCM.compile(parsed).duration;
-      if (id !== requestId) return false;
+      if (id !== requestId || options.signal?.aborted) return false;
       if (initializing) await initializing;
       if (transport) await transport.stop();
-      if (id !== requestId) return false;
+      if (id !== requestId || options.signal?.aborted) return false;
       if (synth) synth.dispose(); synth = null; transport = null;
       midi = parsed; pcmDuration = compiledDuration; setUiState(0);
       const u = getUi();
@@ -246,7 +261,7 @@
     message('Arrastra un MIDI a la página o pulsa Cargar MIDI');
   }
   window.JSSCCMidi = {
-    loadFile, parseMidi: P.parseMidi, play: () => request('play'), pause: () => request('pause'),
+    loadFile, unlockAudio, parseMidi: P.parseMidi, play: options => request('play', undefined, options), pause: () => request('pause'),
     stop: () => request('stop'), seek: value => request('seek', value), exportWav,
     render: options => { if (!midi) throw new Error('No MIDI loaded'); return selectedAudio().renderMidi(midi, D, {instrumentSet, ...options}); },
     setEngine, get engine() {return engineMode;},
