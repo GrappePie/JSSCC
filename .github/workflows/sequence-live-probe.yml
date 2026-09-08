@@ -1,0 +1,53 @@
+name: Direct sequence live probe
+on:
+  push:
+    branches: [feat/direct-sequence-play-20260908]
+    paths: [.github/workflows/sequence-live-probe.yml, js/sequence-codec.js]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch bounded public sequences and verify actual conversion
+        shell: bash
+        run: |
+          mkdir -p live-results
+          node <<'JS'
+          const fs=require('node:fs'),crypto=require('node:crypto');
+          const C=require('./js/sequence-codec.js'),P=require('./js/midi-core.js');
+          const base='https://jsscc-sequence-bridge.lovable.app/api/public/sequence-bridge';
+          const results=[];
+          (async()=>{
+            for(const [query,origin,status] of [['health=1','https://grappepie.github.io',200],['id=abc','https://grappepie.github.io',400],['id=1536400','https://evil.example',403]]){
+              const r=await fetch(base+'?'+query,{headers:{Origin:origin},signal:AbortSignal.timeout(25000)});
+              results.push({query,origin,status:r.status,pass:r.status===status,cors:r.headers.get('access-control-allow-origin')});await r.body.cancel();
+            }
+            for(const id of [1536400,5751539,5760498,5729533,4968652,5730663,5760767]){
+              try{
+                const r=await fetch(base+'?id='+id,{headers:{Origin:'https://grappepie.github.io'},signal:AbortSignal.timeout(25000)});
+                if(r.status!==200)throw Error('HTTP '+r.status);
+                const bytes=new Uint8Array(await r.arrayBuffer());
+                if(bytes.length>C.MAX_BYTES)throw Error('oversize');
+                const seq=C.decode(bytes),out=C.encodeMidi(seq,{id}),midi=P.parseMidi(out.bytes.buffer,'probe.mid');
+                results.push({id,pass:true,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),report:out.report,parsedNotes:midi.events.filter(e=>e.type==='on').length,cors:r.headers.get('access-control-allow-origin'),sequenceHeader:r.headers.get('x-sequence-id')});
+              }catch(e){results.push({id,pass:false,error:e.message});}
+            }
+            fs.writeFileSync('live-results/live-conversion.json',JSON.stringify({commit:process.env.GITHUB_SHA,source:'real HTTPS requests; no fixture responses; raw songs not persisted',results},null,2));
+            console.log(JSON.stringify(results,null,2));if(results.some(x=>!x.pass))process.exitCode=1;
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-sequence-live-probe
+          path: live-results
+          retention-days: 7
