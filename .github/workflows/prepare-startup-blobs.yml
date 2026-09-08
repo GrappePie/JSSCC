@@ -1,0 +1,54 @@
+name: Prepare exact renderer startup blobs
+on:
+  push:
+    branches: [fix/panel-startup-20260908]
+    paths: [.github/workflows/prepare-startup-blobs.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: github.repository == 'GrappePie/JSSCC' && github.ref == 'refs/heads/fix/panel-startup-20260908'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 8b12936936c813fdabed51fcbeafc2c50a9ccd86
+          persist-credentials: false
+      - name: Create only the two reviewed blob objects; do not commit or push
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          from pathlib import Path
+          import hashlib, json, os, urllib.request
+          out=Path('prepared');out.mkdir()
+          def git_hash(raw):
+              return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+          specs=[
+              ('js/jsscc.js','this.loader.onload.push(function () {','_this','8f8bbea9202215cb6cfbcc0fd05f096f3766cbaf','cb7cfa0d743efeb6761dda0688a54a2c756e20c2'),
+              ('src/canvas.ts','this.loader.onload.push(() => {','this','a516f4b78b6ac189a49eb382e379c0e8a2f1d48a','f4d44e458f6522eee61aabf4fe8c1766dd9876ca')]
+          results=[]
+          for name,signature,obj,before,after in specs:
+              raw=Path(name).read_bytes()
+              assert git_hash(raw)==before, name+' input changed'
+              text=raw.decode('utf-8')
+              old=signature+'\n            '+obj+'.loadEvents--;'
+              new=signature+'\n            // Assets can finish before window.load; later observers need canvas/hitDetector.\n            '+obj+'.initCanvas();\n            '+obj+'.loadEvents--;'
+              assert text.count(old)==1
+              patched=text.replace(old,new).encode('utf-8')
+              assert git_hash(patched)==after, name+' output differs from reviewed patch'
+              payload=json.dumps({'content':patched.decode('utf-8'),'encoding':'utf-8'}).encode()
+              req=urllib.request.Request('https://api.github.com/repos/GrappePie/JSSCC/git/blobs',data=payload,method='POST',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=20) as response: result=json.load(response)
+              assert result['sha']==after
+              results.append({'path':name,'before':before,'sha':result['sha']})
+          (out/'blobs.json').write_text(json.dumps(results,indent=2))
+          print(json.dumps(results,indent=2))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-startup-blobs
+          path: prepared
+          retention-days: 7
