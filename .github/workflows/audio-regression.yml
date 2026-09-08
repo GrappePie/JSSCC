@@ -1,0 +1,50 @@
+name: Audio regression checks
+on:
+  push:
+    branches: [github-pages, fix/audit-20260908]
+  pull_request:
+    branches: [github-pages]
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Preserve exact implementation and tests
+        run: |
+          mkdir -p test-results
+          git rev-parse HEAD > test-results/commit.txt
+          git archive --format=zip HEAD js/midi-core.js js/audio-core.js js/gxscc-exact-data.js js/gxscc-exact-engine-v3.js css/player-controls.css index.html tests tools docs/AUDIT_FIX_VALIDATION.md .github/workflows/audio-regression.yml > test-results/tested-source.zip
+      - name: Run required Node regression suite
+        run: node --test tests/regressions.cjs | tee test-results/node-tests.txt
+      - name: Install pinned browser test dependencies
+        run: python -m pip install playwright==1.55.0 numpy==2.2.6
+      - name: Install Chromium for end-to-end tests
+        run: python -m playwright install --with-deps chromium
+      - name: Generate original synthetic MIDI corpus
+        run: node tools/generate_corpus.cjs test-results/corpus
+      - name: Test comparison tool on synthetic WAVs
+        run: python tools/compare_wavs.py --self-test --output test-results/comparison-self-test.json
+      - name: Test the full HTTP site and real Web Audio
+        run: python tests/browser_regressions.py test-results | tee test-results/browser-tests.log
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-regression-evidence
+          path: test-results
+          retention-days: 7
