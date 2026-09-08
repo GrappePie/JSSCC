@@ -4,7 +4,14 @@
 (function(root){
   'use strict';
   const M=root.JSSCCMeterData, clamp=M.clamp;
-  const VERSION='ui-live-20260908.1';
+  const VERSION='ui-live-20260908.2';
+  // B236E bitmap 133, y650, x36+18*min(activeVoices,6). See docs/POLY_COLORS_20260908.md.
+  // This is voice count, NOT volume, clipping, CPU load, or a warning scale.
+  const POLY_COLORS=Object.freeze(['#5c1f09','#b50000','#ef2f00','#ff6c00','#ff9f00','#ffcc00','#ffff3c']);
+  const polyToColor=(voices,palette)=>{
+    const n=Number.isFinite(voices)?Math.max(0,Math.min(6,Math.floor(voices))):0;
+    return n===0?palette.foreground:POLY_COLORS[n];
+  };
   const meterKey=x=>Math.floor(clamp(x)*15+1e-6);
   const panKey=x=>x===null?'off':Math.round(clamp(x,-1,1)*8);
   const timeText=seconds=>{
@@ -17,7 +24,7 @@
       if(!r||!r.initialized||r.loadEvents!==0)return;
       if(r!==this.renderer||r.palette!==this.palette){
         this.renderer=r;this.palette=r.palette;this.keys.clear();
-        r.polyToColor=n=>n>1?r.palette.white:n>0?r.palette.light:r.palette.foreground;
+        r.polyToColor=n=>polyToColor(n,r.palette);
         r.redraw();this.fullRedraws++;
       }
       const group=(name,key,index)=>{
@@ -141,5 +148,5 @@
       fullRedraws:this.panel.fullRedraws,regionDraws:this.panel.regionDraws,buffer:{...this.health},
       polyphony:this.channels.map(c=>c.lamp),audioKernelModified:false};}
   }
-  root.JSSCCUIMonitor={VERSION,Monitor,Panel,timeText};
+  root.JSSCCUIMonitor={VERSION,Monitor,Panel,timeText,POLY_COLORS,polyToColor};
 })(window);

@@ -32,7 +32,7 @@ with sync_playwright()as p:
   page.click('#jsscc-play');page.wait_for_function('ui.song.channels[0].poly===3 && ui.song.buffer>.9 && ui.song.channels[0].envelope>.2',timeout=12000)
   check('three real voices drive POLY and envelope',True,page.evaluate('({poly:ui.song.channels[0].poly,envelope:ui.song.channels[0].envelope,health:JSSCCMidi.diagnostics().ui.buffer})'))
   pixels=page.evaluate('''()=>{const r=ui.renderer,p=(x,y)=>Array.from(r.ctx.getImageData(x,y,1,1).data).slice(0,3),rgb=s=>{const c=document.createElement('canvas').getContext('2d');c.fillStyle=s;c.fillRect(0,0,1,1);return Array.from(c.getImageData(0,0,1,1).data).slice(0,3)};return{poly:p(81,56),idle:p(189,56),buffer:p(450,36),light:rgb(r.palette.light),white:rgb(r.palette.white),dark:rgb(r.palette.foreground)}}''')
-  check('POLY rectangle is visibly illuminated on the actual canvas',pixels['poly']==pixels['white'],pixels)
+  check('three-voice POLY rectangle uses original orange on the actual canvas',pixels['poly']==[255,108,0],pixels)
   check('unused channel POLY rectangle stays dark',pixels['idle']==pixels['dark'],pixels)
   check('buffer fill is visible and is not erased by a second background rectangle',pixels['buffer']==pixels['light'],pixels)
   page.wait_for_function('ui.song.channels[0].cc0===8')
@@ -56,6 +56,28 @@ with sync_playwright()as p:
   # A completely new tune must reset displayed program/bank/control history.
   page.set_input_files('#jsscc-file',{'name':'fresh-ui-probe.mid','mimeType':'audio/midi','buffer':midi});page.wait_for_timeout(100)
   check('file replacement starts with clean metering',page.evaluate('ui.song.channels[0].cc0===0 && ui.song.channels[0].poly===0 && ui.song.buffer===0'))
+  # All native levels, including the six-plus cap, using actual simultaneous voices.
+  colors_track=[0,255,81,3,7,161,32]
+  for channel in range(1,8):
+   colors_track.extend([0,192+channel,16])
+   for note in range(channel):colors_track.extend([0,144+channel,60+note,70+channel*5])
+  colors_track.extend([*vlq(9600),255,47,0])
+  color_midi=b'MThd'+(6).to_bytes(4,'big')+bytes([0,0,0,1,1,224])+b'MTrk'+len(colors_track).to_bytes(4,'big')+bytes(colors_track)
+  page.evaluate('ui.switchPalette("default")');page.wait_for_function('ui.renderer.paletteName==="default"')
+  page.set_input_files('#jsscc-file',{'name':'poly-color-counts.mid','mimeType':'audio/midi','buffer':color_midi})
+  page.wait_for_function('ui.song.fileName==="poly-color-counts.mid"')
+  page.click('#jsscc-play')
+  page.wait_for_function('ui.song.channels.slice(0,8).every((c,i)=>c.poly===i)',timeout=12000)
+  page.wait_for_timeout(100)
+  expected=[[92,31,9],[181,0,0],[239,47,0],[255,108,0],[255,159,0],[255,204,0],[255,255,60],[255,255,60]]
+  color_pixels=page.evaluate('Array.from({length:8},(_,i)=>Array.from(ui.renderer.ctx.getImageData(81+i*36,56,1,1).data).slice(0,3))')
+  for count in range(8):
+   check('original POLY RGB for '+str(count)+' actual voices',color_pixels[count]==expected[count],{'voices':count,'actual':color_pixels[count],'expected':expected[count]})
+  page.screenshot(path=str(OUT/'poly-colors-playing.png'),full_page=True)
+  page.evaluate('ui.switchPalette("gameboy")');page.wait_for_function('ui.renderer.paletteName==="gameboy"');page.wait_for_timeout(100)
+  changed_pixels=page.evaluate('Array.from({length:7},(_,i)=>Array.from(ui.renderer.ctx.getImageData(117+i*36,56,1,1).data).slice(0,3))')
+  check('active POLY color coding survives a real palette switch',changed_pixels==expected[1:],changed_pixels)
+  page.click('#jsscc-stop');page.wait_for_function('ui.song.channels.every(c=>c.poly===0&&c.polyDisplay===0)')
   check('no browser exceptions',not errors,errors)
  except Exception:
   (OUT/'ui-failure.json').write_text(json.dumps({'errors':errors,'diagnostics':page.evaluate('window.JSSCCMidi?JSSCCMidi.diagnostics():null')},indent=2));page.screenshot(path=str(OUT/'ui-failure.png'),full_page=True);raise

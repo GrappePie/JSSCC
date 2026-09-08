@@ -54,9 +54,24 @@ test('dirty renderer never repaints static panel on every frame and responds to 
  const song={channels:[{poly:0,polyDisplay:0,mute:false,volume:0,expression:0,envelope:0,output:0,panpot:null,pitchbend:null,percussion:1,cc0:0,freq:0,hold:false,drum:false,waveKey:'a'}],buffer:0,position:0,timeText:'0',bpm:120,ppq:480,fileName:'test.mid'};
  const p=new UI.Panel();p.draw(r,song);let n=p.regionDraws;
  for(let i=0;i<120;i++)p.draw(r,song);assert.equal(p.fullRedraws,1);assert.equal(p.regionDraws,n);
- song.channels[0].polyDisplay=3;p.draw(r,song);assert.equal(p.regionDraws,n+1);assert.equal(r.polyToColor(0),'#111');assert.equal(r.polyToColor(1),'#eee');assert.equal(r.polyToColor(3),'#fff');
+ song.channels[0].polyDisplay=3;p.draw(r,song);assert.equal(p.regionDraws,n+1);assert.equal(r.polyToColor(0),'#111');assert.equal(r.polyToColor(1),'#b50000');assert.equal(r.polyToColor(3),'#ff6c00');
  r.palette={...r.palette,light:'#f00'};p.draw(r,song);assert.equal(p.fullRedraws,2);
 });
 test('primary renderer uses rAF and independent audio scheduling remains present',()=>{
  const s=fs.readFileSync('js/gxscc-exact-engine-v3.js','utf8');assert.ok(s.includes('requestAnimationFrame(animate)'));assert.ok(!s.includes('setInterval(renderUi'));assert.ok(s.includes('transport.tick();}},25)'));
+});
+
+// These expected RGB values are independently read from the original B236E bitmap,
+// not generated from the implementation being tested.
+test('POLY colors match all seven original sprite levels and cap at six voices',()=>{
+ const palette={foreground:'#5c1f09',light:'#ffd2a2',white:'#fff'};
+ const expected=['#5c1f09','#b50000','#ef2f00','#ff6c00','#ff9f00','#ffcc00','#ffff3c'];
+ for(let n=0;n<=46;n++)assert.equal(UI.polyToColor(n,palette),expected[Math.min(n,6)],'voices='+n);
+ assert.ok(Object.isFrozen(UI.POLY_COLORS));
+});
+test('POLY keeps the native active color coding across palettes; zero uses the off color',()=>{
+ const palette={foreground:'#123456',light:'#112233',white:'#445566'};
+ assert.equal(UI.polyToColor(0,palette),'#123456');
+ assert.equal(UI.polyToColor(1,palette),'#b50000');assert.equal(UI.polyToColor(6,palette),'#ffff3c');
+ for(const n of [NaN,Infinity,-Infinity,-1,undefined,null])assert.equal(UI.polyToColor(n,palette),'#123456');
 });
