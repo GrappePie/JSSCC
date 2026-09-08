@@ -17,6 +17,7 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 results=[]
 def record(name, value, details=None):
     results.append({'test':name,'pass':bool(value),'details':details})
+    (OUT/'browser-tests.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
     if not value: raise AssertionError(f'{name}: {details}')
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium') or shutil.which('chromium-browser'), headless=True, args=['--no-sandbox'])
@@ -80,8 +81,15 @@ with sync_playwright() as p:
     def click_legacy(name):
         point=page.evaluate("""name=>{const r=ui.renderer.hitDetector.regions[name],box=ui.renderer.canvas.getBoundingClientRect();return {x:box.left+(r.x+r.w/2)*ui.renderer.scale,y:box.top+(r.y+r.h/2)*ui.renderer.scale};}""",name)
         page.mouse.click(point['x'],point['y'])
-    click_legacy('play');page.wait_for_function('JSSCCMidi.diagnostics().state === "playing"');page.wait_for_timeout(200)
-    record('original canvas Play controls the new engine',page.evaluate('JSSCCMidi.diagnostics().position > .1'))
+    click_legacy('play')
+    # Transport.state becomes playing before AudioContext.resume resolves. Wait
+    # for the observable audio clock, not a fixed 200 ms on a busy CI runner.
+    try:
+        page.wait_for_function('JSSCCMidi.diagnostics().contextState === "running" && JSSCCMidi.diagnostics().position > .1', timeout=5000)
+    except Exception:
+        page.screenshot(path=str(OUT/'canvas-play-failure.png'),full_page=True)
+        record('original canvas Play controls the new engine',False,page.evaluate('({audio:JSSCCMidi.diagnostics(),uiState:ui.song.playState})'))
+    record('original canvas Play controls the new engine',page.evaluate('JSSCCMidi.diagnostics().position > .1'),page.evaluate('JSSCCMidi.diagnostics()'))
     record('unused channels no longer animate fake sine meters',page.evaluate('ui.song.channels[5].volume === 0'))
     click_legacy('pause');page.wait_for_function('JSSCCMidi.diagnostics().state === "paused"')
     record('original canvas Pause freezes the engine',page.evaluate('JSSCCMidi.diagnostics().contextState === "suspended"'))

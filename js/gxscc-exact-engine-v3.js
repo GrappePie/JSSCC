@@ -147,7 +147,7 @@
     select.onchange = () => instrument(Number(select.value)); row.appendChild(select);
     const label = document.createElement('label'); label.textContent = 'Nivel de salida ';
     gainInput = document.createElement('input'); gainInput.id = 'jsscc-gain'; gainInput.type = 'range';
-    gainInput.min = '0'; gainInput.max = '0.5'; gainInput.step = '.01'; gainInput.value = '.12';
+    gainInput.min = '0'; gainInput.max = '0.5'; gainInput.step = '.01'; gainInput.value = '.25';
     gainInput.oninput = () => { if (synth) synth.master.gain.setValueAtTime(Number(gainInput.value), context.currentTime); };
     label.appendChild(gainInput); row.appendChild(label);
     seekBar = document.createElement('input'); seekBar.type = 'range'; seekBar.min = '0'; seekBar.max = '1'; seekBar.step = '.0001'; seekBar.value = '0';
@@ -198,7 +198,8 @@
     get instrumentSet() { return instrumentSet; }, set instrumentSet(v) { instrument(v); },
     diagnostics: () => ({version: A.VERSION, state: transport ? transport.state : 'stopped',
       position: transport ? transport.position : 0, contextState: context ? context.state : 'not-created',
-      activeVoices: synth ? synth.active().length : 0, originalAudioCompared: false,
+      activeVoices: synth ? synth.active().length : 0, originalAudioCompared: true, originalAudioEquivalent: false,
+      comparisonScope: '3 baseline + 26 isolated follow-up cases; not full fidelity',
       warnings: [...(midi ? midi.warnings : []), ...(synth ? synth.warnings : [])]})
   };
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', setup, {once: true}); else setup();
