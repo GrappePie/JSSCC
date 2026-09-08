@@ -130,5 +130,6 @@
     syncPalette();window.dispatchEvent(new Event('resize'));
     window.JSSCCEditionUI={openLibrary:()=>open.click(),diagnostics:()=>({version:E.version,brandingReady:repoHooked,liveCatalog:false,officialPartnership:false,links:all().length,associatedFiles:midiFiles.size,associatedBytes:usedBytes,remoteThumbnails:thumbnails})};
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+  // Match the player's window-level DOMContentLoaded listener so its controls exist first.
+  if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
