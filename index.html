@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
-  <title>JSSCC</title>
+  <title>JSSCC — PCM Edition · GrappePie</title>
+  <meta name="description" content="Edición experimental de JSSCC mantenida por GrappePie: MIDI a chiptune en tu navegador, motor PCM y exportación WAV.">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./css/jsscc.css">
   <link rel="stylesheet" href="./css/player-controls.css?v=ui-live-1">
+  <link rel="stylesheet" href="./css/edition.css?v=edition-1">
 </head>
 <body>
   <div>
@@ -17,7 +19,8 @@
     <canvas id="config"></canvas>
   </div>
 
-  <script src="./js/jsscc.js?v=20260908-1"></script>
+  <script src="./js/edition-info.js?v=edition-1"></script>
+  <script src="./js/jsscc.js?v=edition-1"></script>
   <script src="./js/gxscc-exact-data.js?v=audit-fix-1"></script>
   <script src="./js/midi-core.js?v=pcm-3"></script>
   <script src="./js/audio-core.js?v=reference-fix-2"></script>
@@ -26,5 +29,7 @@
   <script src="./js/ui-monitor.js?v=ui-live-2"></script>
   <script src="./js/pcm-bridge.js?v=ui-live-1"></script>
   <script src="./js/gxscc-exact-engine-v3.js?v=ui-live-1"></script>
+  <script src="./js/sequencer-library.js?v=edition-1"></script>
+  <script src="./js/edition-ui.js?v=edition-1"></script>
 </body>
 </html>

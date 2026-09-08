@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-09-08",
+  "originHeader": "https://grappepie.github.io",
+  "credentials": false,
+  "run": "https://github.com/GrappePie/JSSCC/actions/runs/34277835715",
+  "responses": [
+    {
+      "url": "https://onlinesequencer.net/robots.txt",
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/plain; charset=utf-8"
+      },
+      "bytes": 2013
+    },
+    {
+      "url": "https://onlinesequencer.net/sequences",
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/html; charset=UTF-8"
+      },
+      "bytes": 34735
+    },
+    {
+      "url": "https://onlinesequencer.net/1536400",
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/html; charset=UTF-8"
+      },
+      "bytes": 46610
+    },
+    {
+      "url": "https://onlinesequencer.net/app/api/get_proto.php?id=1536400",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/octet-stream"
+      },
+      "bytes": 45093
+    }
+  ]
+}

@@ -1,17 +1,41 @@
-# JSSCC
+# JSSCC — PCM Edition
 
-JSSCC is a JavaScript reimplementation of the popular [GXSCC](https://meme.institute/gxscc/) synthesizer. It simulates popular 8-bit & 16-bit sound chips to turn any MIDI into an "8-bit" ([sort of](#its-not-8-bit)) version.
+**v0.1.0 · Experimental · maintained by GrappePie**
 
-## Supported sound chips
+A browser MIDI-to-chiptune player derived from JSSCC, with an independently written experimental integer PCM engine informed by measurements of Gashisoft GXSCC B236E. This is not an official Gashisoft release, nor a claim of complete emulation.
 
-- ~~[Konami SCC](https://en.wikipedia.org/wiki/Konami_SCC) (MSX)~~
-- ~~[Ricoh 2A03/2A07](https://en.wikipedia.org/wiki/Ricoh_2A03) (NES/Famicom)~~
-- ~~Generic [FM Synth](https://en.wikipedia.org/wiki/Frequency_modulation_synthesis)~~
-- ~~Generic [Additive Synth](https://en.wikipedia.org/wiki/Additive_synthesis)~~
-- ~~Generic [Subtractive Synth](https://en.wikipedia.org/wiki/Subtractive_synthesis)~~
-- ~~Generic [Wavetable Synth](https://en.wikipedia.org/wiki/Wavetable_synthesis)~~
+[Open the player](https://grappepie.github.io/JSSCC/) · [Credits and licensing status](https://grappepie.github.io/JSSCC/credits.html)
 
-*(Note: For an open-source [sample-based synth](https://en.wikipedia.org/wiki/Sample-based_synthesis), see my other project, [swood](https://github.com/milkey-mouse/swood).)*
+## Using the player
 
-### "It's not 8-bit!"
-[Inverse Phase](http://inversephase.tumblr.com/post/45483500857/slightly-more-accurate-msx-audio-thread) (and [others](https://youtu.be/vMVXTuMupw8)) have made the (valid) point that GXSCC only *sounds* like it's 8-bit. When it's "emulating" an SCC or 2A03 (the NES sound chip) it simply plays a MIDI with SCC-like or NES-like sounds. Even when the sounds are accurate, the large number of supported channels means you'd need at least seven NESes to play it like GXSCC! This takes the same approach as GXSCC; however, there will be a "strict mode" that will impose the same limitations as the real hardware on the MIDI. Of course, music specifically written for what you're trying to emulate (e.g. an [NSF](https://en.wikipedia.org/wiki/NES_Sound_Format)) will almost always sound better than the results of JSSCC or GXSCC because it has been composed or arranged with the hardware's idiosyncracies in mind. That being said, it's still fun being able to create "fake-bit" versions of songs in half a minute!
+Drop a `.mid`/`.midi` file or choose **Cargar MIDI**, then press Play. The browser synthesizes the sound locally. Pause, resume, seek, repeat, channel mute, instrument sets and PCM16 stereo WAV export are available. The previous Web Audio engine remains selectable. PCM export is bounded to ten minutes and MIDI input to 16 MiB.
+
+The retro UI has live voice-count colors, envelope/output readings and timing fields. BUFFER WEB reports observed audio-heartbeat continuity, not the original Windows queue occupancy.
+
+## Online Sequencer reference library — first stage
+
+The **OS / Online Sequencer** button opens a palette-matched horizontal card library. The bundled entries are selected links checked on 2026-09-08, **not a live feed**. Filter by title/author, add an Online Sequencer URL/ID, open a song on its official page, and associate a locally exported MIDI to play it through PCM Edition. The selected MIDI is kept only in RAM for this session (32 MiB total); only user-added link metadata is saved locally.
+
+Automatic cross-origin catalog/sequence loading is **not implemented**. The catalog and sequence-data responses inspected on 2026-09-08 did not include an Access-Control-Allow-Origin header for this page. We do not use an open proxy, scraped song archive, external credentials or background polling. An approved API/CORS arrangement or agreed server adapter is the next step. There is no official partnership. Remote thumbnails are opt-in. The OS badge is a locally styled label, not their official logo.
+
+See [integration scope and evidence](docs/ONLINE_SEQUENCER_INTEGRATION.md).
+
+## Development and verification
+
+Serve this directory over HTTP (for example `python -m http.server 8000`) and visit localhost. AudioWorklet requires a supported secure context (HTTPS or localhost). No production backend is required for the current functionality.
+
+```sh
+node --test tests/regressions.cjs tests/pcm-regressions.cjs tests/pcm-polyphony.cjs tests/ui-meters.cjs tests/edition-regressions.cjs
+```
+
+GitHub Actions also exercises the real HTTP player, native Chromium AudioWorklet, WAV exports, actual canvas pixels and the reference-library flow. Test outcomes apply to the cases covered, not to all devices or all music.
+
+Product identity is in `js/edition-info.js`; audio and live-meter diagnostic versions are intentionally independent. The historical TypeScript UI lives in `src/` and its browser build in `js/jsscc.js`; modern PCM/UI modules are standalone JavaScript. Detailed reverse-engineering and validation limits are under `docs/`.
+
+## Provenance and licensing status
+
+Original JSSCC notice: **© 2017 meme.institute + Milkey Mouse**. Repository of provenance: [twilligon/JSSCC](https://github.com/twilligon/JSSCC); historical link: [milkey-mouse/JSSCC](https://github.com/milkey-mouse/JSSCC). The inherited README is retained in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md).
+
+This edition is maintained by GrappePie, with development assistance from ChatGPT. New work does not erase upstream authorship. GXSCC is by Gashisoft; song rights remain with their respective authors/rights holders.
+
+No explicit general upstream license was identified in its root/README during review. **This edition does not relicense the inherited code or assets and does not grant blanket redistribution rights.** Verify the permissions for each component before reuse/distribution; public code visibility alone is not a license. Consult [credits.html](credits.html) and GitHub's [licensing documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
