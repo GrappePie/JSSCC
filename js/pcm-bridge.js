@@ -16,8 +16,16 @@
         const url=moduleURL || new URL('./js/pcm-worklet.js?v=pcm-3',document.baseURI).href;
         const controller=new AbortController();
         const timeout=setTimeout(()=>controller.abort(),10000);
-        let objectURL=null, moduleTimer=null;
+        let objectURL=null, moduleTimer=null, warmup=null, silence=null;
         try {
+          // Start a silent native graph before module registration. Some realtime
+          // contexts defer their render thread until an active source is connected.
+          // OfflineAudioContext must not be resumed before startRendering.
+          if (typeof context.close === 'function') {
+            warmup=context.createConstantSource();silence=context.createGain();
+            silence.gain.value=0;warmup.connect(silence).connect(context.destination);warmup.start();
+            await context.resume();
+          }
           const files=await Promise.all([new URL('./pcm-core.js?v=pcm-3',url).href,url].map(async path=>{
             const response=await fetch(path,{signal:controller.signal});
             if(!response.ok)throw Error('No se pudo cargar el módulo PCM: '+response.status);
@@ -32,6 +40,7 @@
           ]);
         } finally {
           clearTimeout(timeout);clearTimeout(moduleTimer);
+          if(warmup){try{warmup.stop();}catch(_){}warmup.disconnect();silence.disconnect();}
           if(objectURL)URL.revokeObjectURL(objectURL);
         }
       })().catch(error=>{prepared.delete(context);throw error;});
