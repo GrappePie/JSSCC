@@ -158,6 +158,9 @@
     for(let i=0;i<tempoPoints.length;i++)duration+=((tempoPoints[i+1]?.time??end)-tempoPoints[i].time)*15/tempoPoints[i].bpm;
     if(duration>600)fail('máximo 10 minutos para importación remota');
     const tracks=[],ids=[...new Set(audible.map(n=>n.instrument))],melodic=Array.from({length:32},(_,i)=>i).filter(i=>i%16!==9);
+    const mergeDrums=ids.filter(id=>drumIds.has(id%10000)).length>2;
+    if(ids.length>128)fail('más de 128 pistas de origen');
+    if(mergeDrums)warnings.add('Más de dos kits se combinaron en un canal de percusión; volumen aplicado por golpe y panorama centrado.');
     let next=0,drums=0,eventCount=0,clipped=0,noteCount=0;
     const text=s=>Array.from(new TextEncoder().encode(String(s).replace(/[\x00-\x1f\x7f]/g,' ').slice(0,240)));
     function vlq(n){if(!Number.isSafeInteger(n)||n<0||n>0x0fffffff)fail('tiempo MIDI fuera de rango');const v=[n&127];while(n=Math.floor(n/128))v.unshift((n&127)|128);return v;}
@@ -174,9 +177,8 @@
     for(const p of tempoPoints)if(p.bpm!==previousBpm){const us=Math.round(60000000/p.bpm);conductor(p.time,meta(81,[(us>>>16)&255,(us>>>8)&255,us&255]),0);previousBpm=p.bpm;}
     for(const id of ids) {
       const base=id%10000,drum=drumIds.has(base);
-      if(drum&&drums===2)fail('más de dos kits de percusión independientes');
       if(!drum&&next===melodic.length)fail('más de 30 instrumentos melódicos independientes');
-      const channel=drum?9+16*drums++:melodic[next++],c=channel%16,port=Math.floor(channel/16);
+      const channel=drum?(mergeDrums?9:9+16*drums++):melodic[next++],c=channel%16,port=Math.floor(channel/16);
       const s=seq.instruments.get(id)||{volume:1,pan:0,detune:0,name:''};
       const vol=curve(s.volume,by(1,id),0,4),pan=curve(s.pan,by(2,id),-1,1),tuning=curve(s.detune,by(11,id),-12000,12000);
       const peakScale=Math.max(1,globalVolume.max*vol.max),add=track();
@@ -185,7 +187,8 @@
       if(base>=programs.length){program=80;warnings.add('Instrumentos desconocidos se interpretaron como lead cuadrado.');}
       add(0,[192|c,program],0);add(0,[176|c,7,127],0);
       let prevExp=-1,prevPan=-1;
-      for(const t of samplingTimes([vol,globalVolume,pan],end)) {
+      if(drum&&mergeDrums){add(0,[176|c,11,127],0);add(0,[176|c,10,64],0);}
+      for(const t of (drum&&mergeDrums?[]:samplingTimes([vol,globalVolume,pan],end))) {
         const expr=clamp(Math.round(127*vol.at(t)*globalVolume.at(t)/peakScale),0,127),p=clamp(Math.round((pan.at(t)+1)*63.5),0,127);
         if(expr!==prevExp){add(t,[176|c,11,expr],0);prevExp=expr;}
         if(p!==prevPan){add(t,[176|c,10,p],0);prevPan=p;}
@@ -199,7 +202,7 @@
         }
         if(!drum)pitch+=Math.round(tuning.at(n.time)/100);
         if(pitch<0||pitch>127){warnings.add('Se omitieron notas fuera del rango MIDI.');continue;}
-        const rawVelocity=Math.round(n.volume*50*peakScale);if(rawVelocity<=0)continue;if(rawVelocity>127)clipped++;
+        const rawVelocity=Math.round(n.volume*50*(drum&&mergeDrums?globalVolume.at(n.time)*vol.at(n.time):peakScale));if(rawVelocity<=0)continue;if(rawVelocity>127)clipped++;
         const velocity=clamp(rawVelocity,1,127);
         add(n.time,[144|c,pitch,velocity],2);
         // Off-before-on at a shared timestamp; preserve sub-tick short notes.

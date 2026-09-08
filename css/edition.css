@@ -53,3 +53,9 @@
 @keyframes edition-in{from{transform:translateY(20px);opacity:.6}to{transform:translateY(0);opacity:1}}
 @media(max-width:650px){.edition-drawer{inset:auto 0 0;width:100vw;max-height:95dvh;padding:16px 12px}.edition-drawer h2{font-size:22px}.edition-card{flex-basis:245px}.edition-nav{gap:9px}.edition-rail-row{gap:4px}.edition-drawer .edition-arrow{width:23px}.edition-add-form label{width:100%}.credits-page main{margin:12px;padding:18px}}
 @media(prefers-reduced-motion:reduce){.edition-drawer[open]{animation:none}.edition-rail{scroll-behavior:auto}}
+
+.edition-import,.edition-replay { margin-top: 7px; font-size: 11px; width: 100%; }
+.edition-import { opacity: .85; }
+.edition-cancel { margin-top: 10px; }
+.edition-conversion-warnings { margin-top: 5px; font-size: 11px; }
+.edition-conversion-warnings p { margin: 4px 0; }
