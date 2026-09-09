@@ -37,7 +37,7 @@ jobs:
       - name: Test read-only UI meters and unchanged PCM
         run: node --test tests/ui-meters.cjs | tee test-results/ui-node-tests.txt
       - name: Test edition metadata and safe reference library
-        run: node --test tests/edition-regressions.cjs tests/os-browser-bridge-challenge-regression.cjs tests/os-browser-url-object-regression.cjs | tee test-results/edition-node-tests.txt
+        run: node --test tests/edition-regressions.cjs tests/os-browser-bridge-challenge-regression.cjs tests/os-browser-url-object-regression.cjs tests/os-browser-metadata-regression.cjs | tee test-results/edition-node-tests.txt
       - name: Test renderer bootstrap ordering
         run: node --test tests/startup-regressions.cjs | tee test-results/startup-node-tests.txt
       - name: Test bounded automatic sequence import
