@@ -7,10 +7,36 @@ function sequenceId(){
   return m?m[1]:null;
 }
 function clean(text){return String(text||'').replace(/\s+/g,' ').trim();}
+function stripSiteTitle(text){
+  return clean(text)
+    .replace(/^Online Sequencer\s*[-|:]\s*/i,'')
+    .replace(/\s*[-|:]\s*Online Sequencer(?:\.net)?\s*$/i,'')
+    .trim();
+}
+function usableTitle(text){
+  const t=stripSiteTitle(text);
+  if(!t||/^Online Sequencer(?:\.net)?$/i.test(t)||/^Sequence\s*#?\d+$/i.test(t)||/^Loading\.\.\.$/i.test(t))return '';
+  return t.slice(0,160);
+}
 function songTitle(){
-  const h=document.querySelector('h1,h2,.sequence-title,.title');
-  const text=clean(h?.textContent||document.title.replace(/\s*[-|]\s*Online Sequencer.*$/i,''));
-  return text.slice(0,160);
+  // The page header itself can be an H1/H2 saying only "Online Sequencer".
+  // Prefer page metadata first; sequence pages normally expose the real title there.
+  const meta=document.querySelector('meta[property="og:title"],meta[name="twitter:title"]');
+  const candidates=[meta?.content,document.title];
+  for(const value of candidates){const title=usableTitle(value);if(title)return title;}
+
+  // Fallback to visible headings, but reject site-wide/generic labels.
+  for(const node of document.querySelectorAll('.sequence-title,.title,h1,h2,h3')){
+    const title=usableTitle(node.textContent);if(title)return title;
+  }
+
+  // Last fallback: find a non-empty input associated with a visible Title label.
+  for(const input of document.querySelectorAll('input,textarea')){
+    const value=usableTitle(input.value);if(!value)continue;
+    const context=clean(input.closest('label,div,section')?.textContent||'');
+    if(/\bTitle\b/i.test(context))return value;
+  }
+  return '';
 }
 function pixelIcon(){
   const icon=document.createElement('span');
