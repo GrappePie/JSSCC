@@ -1,7 +1,7 @@
-/* PCM Edition defaults: autoplay on load, repeat enabled, and remote thumbnails enabled. */
+/* PCM Edition defaults: repeat enabled, remote thumbnails enabled, and UI file loads autoplay. */
 (function(root){
   'use strict';
-  let loopApplied=false,wrapped=false,thumbApplied=false;
+  let loopApplied=false,fileAutoplayApplied=false,thumbApplied=false;
 
   function applyLoopDefault(){
     if(loopApplied)return true;
@@ -12,17 +12,31 @@
     return true;
   }
 
-  function wrapAutoplay(){
-    if(wrapped||!root.JSSCCMidi||typeof root.JSSCCMidi.loadFile!=='function')return false;
-    const player=root.JSSCCMidi,original=player.loadFile.bind(player);
-    player.loadFile=async function(file,options={}){
-      const ok=await original(file,options);
-      if(!ok||options.autoplay===false)return ok;
-      applyLoopDefault();
-      await player.play({owner:options.owner||'autoplay-default'});
-      return ok;
-    };
-    wrapped=true;
+  function loadAndPlay(file,owner){
+    const player=root.JSSCCMidi;
+    if(!player||!file)return Promise.resolve(false);
+    applyLoopDefault();
+    return player.loadFile(file,{owner}).then(ok=>ok?player.play({owner}).then(()=>true):false);
+  }
+
+  function applyFileAutoplay(){
+    if(fileAutoplayApplied||!root.JSSCCMidi)return fileAutoplayApplied;
+    const picker=document.getElementById('jsscc-file');
+    if(!picker)return false;
+    picker.addEventListener('change',event=>{
+      const file=picker.files&&picker.files[0];
+      if(!file)return;
+      event.stopImmediatePropagation();
+      loadAndPlay(file,'file-picker-autoplay').finally(()=>{picker.value='';});
+    },true);
+    root.addEventListener('drop',event=>{
+      const file=event.dataTransfer&&event.dataTransfer.files&&event.dataTransfer.files[0];
+      if(!file)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      const overlay=document.getElementById('jsscc-drop');if(overlay)overlay.classList.remove('visible');
+      loadAndPlay(file,'drop-autoplay');
+    },true);
+    fileAutoplayApplied=true;
     return true;
   }
 
@@ -38,16 +52,16 @@
 
   function apply(){
     applyLoopDefault();
-    wrapAutoplay();
+    applyFileAutoplay();
     applyThumbnailDefault();
-    if(loopApplied&&wrapped&&thumbApplied)clearInterval(timer);
+    if(loopApplied&&fileAutoplayApplied&&thumbApplied)clearInterval(timer);
   }
 
   const timer=setInterval(apply,50);
   apply();
   root.JSSCCDefaultPlaybackPreferences=Object.freeze({
     get loopDefaultApplied(){return loopApplied;},
-    get autoplayWrapped(){return wrapped;},
+    get fileAutoplayApplied(){return fileAutoplayApplied;},
     get thumbnailsDefaultApplied(){return thumbApplied;}
   });
 })(window);
