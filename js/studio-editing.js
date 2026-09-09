@@ -10,6 +10,11 @@
     const q=mode==='floor'?Math.floor(v):mode==='ceil'?Math.ceil(v):Math.round(v);
     return +(q*snap).toFixed(6);
   }
+  function syncedNoteLength(currentLength,previousGrid,nextGrid){
+    const oldSnap=snapSize(previousGrid),newSnap=snapSize(nextGrid),current=Math.max(.5,+currentLength||oldSnap);
+    const followedOldSnap=Math.abs(current-oldSnap)<1e-6;
+    return +(followedOldSnap||current<newSnap?newSnap:current).toFixed(6);
+  }
   function clampMove(notes,deltaStep,deltaPitch,totalSteps,grid){
     if(!notes.length)return {step:0,pitch:0};
     let ds=quantize(deltaStep,grid),dp=Math.round(+deltaPitch||0);
@@ -29,7 +34,25 @@
     const length=resizedLength({...note,step},note.length,grid,totalSteps);
     return {...note,step,length};
   }
-  const api=Object.freeze({gridValue,snapSize,quantize,clampMove,resizedLength,quantizeNote});
+  const api=Object.freeze({gridValue,snapSize,quantize,syncedNoteLength,clampMove,resizedLength,quantizeNote});
   root.JSSCCStudioEditing=api;
   if(typeof module==='object'&&module.exports)module.exports=api;
+
+  // Keep the default paint duration aligned with the selected grid. A duration
+  // the user explicitly made longer than the grid remains untouched.
+  if(typeof window!=='undefined'&&window.addEventListener){
+    window.addEventListener('load',()=>{
+      const grid=document.getElementById('gridSelect'),length=document.getElementById('noteLengthSelect');
+      if(!grid||!length)return;
+      let previousGrid=gridValue(grid.value);
+      const rememberGrid=()=>{previousGrid=gridValue(grid.value);};
+      grid.addEventListener('focus',rememberGrid,true);
+      grid.addEventListener('pointerdown',rememberGrid,true);
+      grid.addEventListener('change',()=>{
+        const nextGrid=gridValue(grid.value);
+        length.value=String(syncedNoteLength(length.value,previousGrid,nextGrid));
+        previousGrid=nextGrid;
+      });
+    });
+  }
 })(globalThis);
