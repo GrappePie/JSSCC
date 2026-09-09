@@ -20,6 +20,16 @@ test('legacy Online Sequencer late channel-pressure program marker gets an indep
   assert.deepEqual(programs,[[4,33],[20,81]]);
   assert.deepEqual(ons,[[4,60],[20,64]]);
   assert.equal(m.compatibility.onlineSequencerSecondBankTracks,1);
+  assert.equal(m.compatibility.onlineSequencerChipTracks,1);
+});
+test('8-bit Sine and Triangle names recover distinct SCC programs even when export marker collapses them',()=>{
+  const tracks=[];
+  for(let i=0;i<16;i++)tracks.push([...end]);
+  tracks.push([...name('8-Bit Sine'),0,0xd0,80,0,0x90,60,100,128,0,0x80,60,0,...end]);
+  tracks.push([...name('8-Bit Triangle'),0,0xd1,80,0,0x91,64,100,128,0,0x81,64,0,...end]);
+  const m=parseMidi(smf(tracks),'os-chip-export.mid');
+  assert.deepEqual(m.events.filter(e=>e.type==='program').map(e=>[e.channel,e.value]),[[16,71],[17,75]]);
+  assert.equal(m.compatibility.onlineSequencerChipTracks,2);
 });
 test('ordinary channel pressure in a small MIDI is not reinterpreted',()=>{
   const m=parseMidi(smf([[...name('Expressive'),0,0xd0,81,0,0x90,60,100,...end]]));
