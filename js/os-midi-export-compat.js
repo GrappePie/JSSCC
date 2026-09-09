@@ -14,13 +14,6 @@
   const ascii=(b,p,s)=>String.fromCharCode(...b.subarray(p,p+s));
   const u32=(b,p)=>(b[p]*0x1000000+b[p+1]*0x10000+b[p+2]*0x100+b[p+3])>>>0;
   const be32=n=>[(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255];
-  const chipPrograms=Object.freeze({
-    '8-bit sine':71,
-    '8-bit square':80,
-    '8-bit sawtooth':81,
-    '8-bit triangle':75
-  });
-  const chipProgram=name=>chipPrograms[String(name||'').trim().toLowerCase()];
   function vlqAt(b,p,end){let value=0,start=p;for(let i=0;i<4&&p<end;i++){const x=b[p++];value=value*128+(x&127);if(!(x&128))return{value,start,end:p};}return null;}
   function inspectTrack(t,trackIndex,trackCount){
     if(trackCount<=16||trackCount>32||trackIndex<16)return null;
@@ -48,10 +41,7 @@
       // Requiring a name and no explicit port keeps ordinary aftertouch untouched.
       if(type===208&&tick===0&&name&&!hasPort){
         const channel=status&15,delta=Array.from(t.subarray(deltaStart,deltaEnd));
-        // Online Sequencer's MIDI export collapses Sine/Square/Triangle onto the
-        // same GM lead. Track names let us recover the distinct SCC waveforms.
-        const program=chipProgram(name);
-        return{start:deltaStart,end:eventEnd,replacement:[...delta,255,33,1,1,0,192|channel,program===undefined?x:program],chip:program!==undefined};
+        return{start:deltaStart,end:eventEnd,replacement:[...delta,255,33,1,1,0,192|channel,x]};
       }
       return null;
     }
@@ -62,28 +52,27 @@
     if(!b||b.length<14||ascii(b,0,4)!=='MThd')return null;
     const h=u32(b,4);if(h<6||8+h>b.length)return null;
     const format=(b[8]<<8)|b[9],tracks=(b[10]<<8)|b[11];if(format!==1||tracks<=16||tracks>32)return null;
-    const chunks=[Array.from(b.subarray(0,8+h))];let p=8+h,ti=0,patched=0,chipPatched=0;
+    const chunks=[Array.from(b.subarray(0,8+h))];let p=8+h,ti=0,patched=0;
     while(p+8<=b.length){const kind=ascii(b,p,4),size=u32(b,p+4),dataStart=p+8,dataEnd=dataStart+size;if(dataEnd>b.length)return null;
       let data=Array.from(b.subarray(dataStart,dataEnd));
       if(kind==='MTrk'){
         const hit=inspectTrack(b.subarray(dataStart,dataEnd),ti,tracks);
-        if(hit){data=[...data.slice(0,hit.start),...hit.replacement,...data.slice(hit.end)];patched++;if(hit.chip)chipPatched++;}
+        if(hit){data=[...data.slice(0,hit.start),...hit.replacement,...data.slice(hit.end)];patched++;}
         ti++;
       }
       chunks.push([...Array.from(b.subarray(p,p+4)),...be32(data.length),...data]);p=dataEnd;
     }
     if(!patched)return null;
     const length=chunks.reduce((n,c)=>n+c.length,0),out=new Uint8Array(length);let o=0;for(const c of chunks){out.set(c,o);o+=c.length;}
-    return{bytes:out,patched,chipPatched};
+    return{bytes:out,patched};
   }
   P.parseMidi=function(input,fileName='MIDI'){
     const result=patch(input);const midi=original(result?result.bytes:input,fileName);
     if(result){
       midi.warnings=[...(midi.warnings||[]),'Online Sequencer second-bank instruments mapped to independent MIDI Port 1 channels'];
-      if(result.chipPatched)midi.warnings.push('Online Sequencer 8-bit track names mapped to dedicated SCC sine/square/saw/triangle waveforms');
-      midi.compatibility={...(midi.compatibility||{}),onlineSequencerSecondBankTracks:result.patched,onlineSequencerChipTracks:result.chipPatched};
+      midi.compatibility={...(midi.compatibility||{}),onlineSequencerSecondBankTracks:result.patched};
     }
     return midi;
   };
-  root.JSSCCOnlineSequencerMidiCompat={patch,chipPrograms};
+  root.JSSCCOnlineSequencerMidiCompat={patch};
 })(typeof window!=='undefined'?window:globalThis);
