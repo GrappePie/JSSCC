@@ -1,7 +1,7 @@
 'use strict';
 const PAGE_SOURCE='JSSCC_PAGE';
 const EXT_SOURCE='JSSCC_OS_BRIDGE';
-const VERSION='0.1.1';
+const VERSION='0.1.2';
 
 window.addEventListener('message',event=>{
   if(event.source!==window||event.origin!==location.origin)return;
