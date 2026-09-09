@@ -5,7 +5,7 @@
  */
 (function(root){
   'use strict';
-  const VERSION='0.1.0';
+  const VERSION='0.1.1';
   const PAGE_SOURCE='JSSCC_PAGE';
   const EXT_SOURCE='JSSCC_OS_BRIDGE';
   const SEARCH_ENDPOINT='https://jsscc-sequence-bridge.lovable.app/api/public/sequence-search';
@@ -19,7 +19,7 @@
   function send(type,payload={},timeout=1200){
     const requestId=id();
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('OS Browser Bridge no detectado'));},timeout);
+      const timer=setTimeout(()=>{pending.delete(requestId);reject(Object.assign(new Error('OS Browser Bridge no detectado'),{code:'not_detected'}));},timeout);
       pending.set(requestId,{resolve,reject,timer});
       root.postMessage({source:PAGE_SOURCE,type,requestId,payload},root.location.origin);
     });
@@ -30,7 +30,7 @@
     if(!data||data.source!==EXT_SOURCE||typeof data.requestId!=='string')return;
     const wait=pending.get(data.requestId);if(!wait)return;
     pending.delete(data.requestId);clearTimeout(wait.timer);lastSeen=Date.now();
-    if(data.ok===false)wait.reject(new Error(data.error||'OS Browser Bridge falló'));
+    if(data.ok===false){const error=new Error(data.error||'OS Browser Bridge falló');error.code=data.code||'bridge_error';wait.reject(error);}
     else wait.resolve(data.payload||{});
   });
 
@@ -56,15 +56,23 @@
       scope:prefs.scope
     };
     if(params.q.length<2)return originalFetch(input,init);
+    const connected=(Date.now()-lastSeen<30000)||await ping();
+    if(!connected)return originalFetch(input,init);
     try{
-      if(!(Date.now()-lastSeen<30000) && !(await ping()))return originalFetch(input,init);
       const payload=await search(params);
       payload.source='browser-extension';
       payload.count=Number.isFinite(payload.count)?payload.count:payload.results.length;
       return new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension'}});
     }catch(error){
-      console.info('[JSSCC] OS Browser Bridge unavailable:',error.message);
-      return originalFetch(input,init);
+      console.info('[JSSCC] OS Browser Bridge search failed:',error.message);
+      const challenge=error.code==='challenge';
+      const body={
+        error:challenge?'browser_challenge':'browser_bridge_error',
+        message:challenge
+          ?'Online Sequencer necesita verificar tu navegador. Completa la verificación en la pestaña que se abrió y después vuelve a buscar.'
+          :(error.message||'El OS Browser Bridge no pudo completar la búsqueda.')
+      };
+      return new Response(JSON.stringify(body),{status:challenge?428:502,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension'}});
     }
   };
 
