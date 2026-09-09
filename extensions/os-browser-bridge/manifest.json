@@ -1,26 +1,16 @@
 {
   "manifest_version": 3,
   "name": "JSSCC Online Sequencer Bridge",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Lets JSSCC search the Online Sequencer catalog through your normal browser session and play results as chiptune.",
   "permissions": ["tabs"],
   "host_permissions": [
     "https://onlinesequencer.net/*",
     "https://grappepie.github.io/JSSCC/*"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
+  "background": {"service_worker": "background.js"},
   "content_scripts": [
-    {
-      "matches": ["https://grappepie.github.io/JSSCC/*"],
-      "js": ["content-jsscc.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["https://onlinesequencer.net/sequences*"],
-      "js": ["content-os.js"],
-      "run_at": "document_idle"
-    }
+    {"matches": ["https://grappepie.github.io/JSSCC/*"],"js": ["content-jsscc.js"],"run_at": "document_start"},
+    {"matches": ["https://onlinesequencer.net/sequences*"],"js": ["content-os.js"],"run_at": "document_idle"}
   ]
 }
