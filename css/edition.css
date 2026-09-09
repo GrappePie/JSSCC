@@ -42,6 +42,9 @@
 .edition-drawer .edition-minor{font-size:10px;min-height:26px;background:transparent;padding:2px 5px;box-shadow:none;border:1px solid var(--edition-foreground)}
 .edition-feedback{font-size:12px;min-height:18px;margin:9px 0}
 .edition-feedback[data-error=true]{font-weight:bold;text-decoration:underline}
+.edition-bridge-filters{display:flex;gap:8px 18px;flex-wrap:wrap;margin:0 0 14px;font-size:11px}
+.edition-filter-group{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.edition-drawer .edition-filter-group .edition-minor[data-active=true]{background:var(--edition-foreground);color:var(--edition-light);box-shadow:none}
 .edition-add-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--edition-foreground);padding-top:14px}
 .edition-add-form label{font-size:12px;font-weight:bold}.edition-add-form input{flex:1 1 290px}
 .edition-options{font-size:11px;margin:12px 0}.edition-options label{display:flex;align-items:center;gap:7px}
@@ -51,7 +54,7 @@
 .credits-page main{max-width:880px;margin:40px auto;padding:30px;background:var(--edition-light);border:3px solid var(--edition-foreground)}
 .credits-page a{color:inherit;text-underline-offset:3px}.credits-page h1{line-height:1.15}.credits-page h2{margin-top:28px;font-size:21px}.credits-page .edition-notice{background:var(--edition-background)}
 @keyframes edition-in{from{transform:translateY(20px);opacity:.6}to{transform:translateY(0);opacity:1}}
-@media(max-width:650px){.edition-drawer{inset:auto 0 0;width:100vw;max-height:95dvh;padding:16px 12px}.edition-drawer h2{font-size:22px}.edition-card{flex-basis:245px}.edition-nav{gap:9px}.edition-rail-row{gap:4px}.edition-drawer .edition-arrow{width:23px}.edition-add-form label{width:100%}.credits-page main{margin:12px;padding:18px}}
+@media(max-width:650px){.edition-drawer{inset:auto 0 0;width:100vw;max-height:95dvh;padding:16px 12px}.edition-drawer h2{font-size:22px}.edition-card{flex-basis:245px}.edition-nav{gap:9px}.edition-rail-row{gap:4px}.edition-drawer .edition-arrow{width:23px}.edition-add-form label{width:100%}.credits-page main{margin:12px;padding:18px}.edition-bridge-filters{gap:6px}}
 @media(prefers-reduced-motion:reduce){.edition-drawer[open]{animation:none}.edition-rail{scroll-behavior:auto}}
 
 .edition-import,.edition-replay { margin-top: 7px; font-size: 11px; width: 100%; }

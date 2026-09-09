@@ -22,8 +22,8 @@ with sync_playwright() as p:
  try:
   page.goto(f'http://127.0.0.1:{server.server_port}/index.html',timeout=12000)
   page.wait_for_function('window.JSSCCEditionUI?.diagnostics().brandingReady && window.ui?.renderer?.loadEvents===0',timeout=12000)
-  check('new product identity is visible',page.title()=='JSSCC — PCM Edition · GrappePie' and 'v0.2.1' in page.locator('#jsscc-edition').inner_text())
-  check('canvas notices preserve upstream copyright and new version',page.evaluate("JSON.stringify(ui.renderer.loader.drawGroups).includes('(C) 2017 meme.institute + Milkey Mouse') && JSON.stringify(ui.renderer.loader.drawGroups).includes('PCM v0.2.1')"))
+  check('new product identity is visible',page.title()=='JSSCC — PCM Edition · GrappePie' and 'v0.3.0' in page.locator('#jsscc-edition').inner_text())
+  check('canvas notices preserve upstream copyright and new version',page.evaluate("JSON.stringify(ui.renderer.loader.drawGroups).includes('(C) 2017 meme.institute + Milkey Mouse') && JSON.stringify(ui.renderer.loader.drawGroups).includes('PCM v0.3.0')"))
   page.click('#jsscc-sequencer');page.wait_for_function("document.querySelectorAll('.edition-card').length===6")
   check('six real-reference cards appear in the drawer',page.locator('.edition-card').count()==6)
   check('selection is not passed off as live catalog or partnership','no es un catálogo en directo' in page.locator('#edition-network-note').inner_text() and 'no oficial' in page.locator('#edition-network-note').inner_text())
