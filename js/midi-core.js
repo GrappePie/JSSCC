@@ -40,9 +40,10 @@
       ticksPerSecond = (frames === 29 ? 30000 / 1001 : frames) * ticks;
     }
     const raw = [], tempos = [{tick: 0, us: 500000, order: -1}], warnings = new Set();
-    const push = e => {
+    let ignoredSilentOverflowTracks = 0;
+    const makeEvent = e => {
       if (serial >= 500000) throw new Error('MIDI exceeds the 500000-event limit');
-      raw.push({...e, order: serial++});
+      return {...e, order: serial++};
     };
     for (let track = 0; track < numberOfTracks; track++) {
       limit = bytes.length;
@@ -54,7 +55,9 @@
       }
       const end = p + size;
       limit = end;
-      let tick = 0, running = 0, port = 0;
+      let tick = 0, running = 0, port = 0, trackName = '';
+      let audibleNoteOns = 0, noteOffLike = 0, overflowMarker = false;
+      const trackRaw = [];
       while (p < end) {
         tick += vlq(); maximumTick = Math.max(maximumTick, tick);
         let status = byte();
@@ -73,6 +76,8 @@
             if (length !== 1) throw new Error('Invalid MIDI port metadata');
             port = bytes[p];
             if (port > 1) warnings.add('Ports above 1 are ignored (32-channel player)');
+          } else if (type === 3) {
+            trackName = String.fromCharCode(...bytes.subarray(p, p + Math.min(length, 160)));
           }
           p += length;
           if (type === 47) {
@@ -85,23 +90,51 @@
           running = 0;
           const length = vlq(); // Read first: computing p + vlq() uses the old p.
           need(length);
-          push({tick, type: 'sysex', data: Array.from(bytes.subarray(p, p + length)), status, port});
+          trackRaw.push(makeEvent({tick, type: 'sysex', data: Array.from(bytes.subarray(p, p + length)), status, port}));
           p += length;
           warnings.add('SysEx is preserved; support depends on the selected audio engine');
           continue;
         }
         if (status >= 240) throw new Error('Unsupported MIDI system status ' + status);
         const type = status & 240, channel = port * 16 + (status & 15);
-        const x = dataByte(), y = type === 192 || type === 208 ? 0 : dataByte();
+        const x = dataByte();
+        // Some large Online Sequencer exports use an otherwise-invalid one-byte E0..EF
+        // event as a third-bank program marker. The following high-bit byte is the next
+        // delta-time, not pitch-bend data. Only recognize this narrow signature in a
+        // >32-track Format-1 file, before any playable event in that late track.
+        if (type === 224 && format === 1 && numberOfTracks > 32 && track >= 32 && tick === 0 &&
+            trackRaw.length === 0 && p < end && (bytes[p] & 128)) {
+          overflowMarker = true;
+          running = 0;
+          continue;
+        }
+        const y = type === 192 || type === 208 ? 0 : dataByte();
         if (port > 1) continue;
-        if (type === 144 || type === 128) push({tick, type: type === 128 || y === 0 ? 'off' : 'on', channel, note: x, velocity: y});
-        else if (type === 192) push({tick, type: 'program', channel, value: x});
-        else if (type === 176) push({tick, type: 'cc', channel, controller: x, value: y});
-        else if (type === 224) push({tick, type: 'bend', channel, value: (y * 128 + x) - 8192});
+        if (type === 144 || type === 128) {
+          const off = type === 128 || y === 0;
+          if (off) noteOffLike++; else audibleNoteOns++;
+          trackRaw.push(makeEvent({tick, type: off ? 'off' : 'on', channel, note: x, velocity: y}));
+        } else if (type === 192) trackRaw.push(makeEvent({tick, type: 'program', channel, value: x}));
+        else if (type === 176) trackRaw.push(makeEvent({tick, type: 'cc', channel, controller: x, value: y}));
+        else if (type === 224) trackRaw.push(makeEvent({tick, type: 'bend', channel, value: (y * 128 + x) - 8192}));
         else warnings.add('Aftertouch is not synthesized');
+      }
+      // Large Format-1 exports can contain extra named tracks that carry no playable
+      // Note On at all, yet reuse active MIDI channels with velocity-zero Note Ons,
+      // Note Offs, CCs or aftertouch. Interpreting those literally can cut or alter
+      // notes from the real audible tracks. In a >32-track file, late tracks with no
+      // audible Note On are semantically silent for a standard MIDI player, so discard
+      // their channel side effects. Tempo metadata above is intentionally retained.
+      const silentOverflow = format === 1 && numberOfTracks > 32 && track >= 16 && audibleNoteOns === 0 &&
+        (noteOffLike >= 2 || overflowMarker);
+      if (silentOverflow) {
+        ignoredSilentOverflowTracks++;
+      } else {
+        raw.push(...trackRaw);
       }
       p = end;
     }
+    if (ignoredSilentOverflowTracks) warnings.add('Ignored ' + ignoredSilentOverflowTracks + ' silent overflow track(s) that reused active MIDI channels');
     tempos.sort((a, b) => a.tick - b.tick || a.order - b.order);
     const map = [];
     for (const t of tempos) {
@@ -129,7 +162,8 @@
     const duration = toSeconds(maximumTick);
     if (!Number.isFinite(duration) || duration > 21600) throw new Error('MIDI duration exceeds six hours');
     return {format, trackCount: numberOfTracks, ppq: ticksPerSecond ? null : division,
-      division, duration, events, tempoEvents: tempos.filter(t => t.order >= 0).map(t => ({...t})), maximumTick, warnings: [...warnings], fileName};
+      division, duration, events, tempoEvents: tempos.filter(t => t.order >= 0).map(t => ({...t})), maximumTick,
+      warnings: [...warnings], compatibility: {ignoredSilentOverflowTracks}, fileName};
   }
   root.JSSCCParser = {parseMidi};
   if (typeof module !== 'undefined' && module.exports) module.exports = root.JSSCCParser;
