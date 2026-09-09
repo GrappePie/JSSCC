@@ -6,10 +6,9 @@
 (function (root) {
   'use strict';
   const VERSION = 'os-midi-20260908.2', MAX_BYTES = 4 * 1024 * 1024;
-  const MAX_NOTES = 100000, MAX_MARKERS = 12000, MAX_EVENTS = 300000, PPQ = 960;
+  const MAX_NOTES = 100000, MAX_MARKERS = 12000, MAX_EVENTS = 300000, PPQ = 960, MAX_REMOTE_DURATION = 3600;
   const programs = [5,26,1,91,28,34,85,104,1,61,58,41,43,81,81,82,81,7,47,14,46,115,105,74,67,4,11,39,20,37,89,119,27,108,12,29,1,39,31,1,1,1,1,6,31,43,41,49,33,28,61,58,91,1,34,91,40,91,25,53,1,62,3,20,0];
   const drumIds = new Set([2,31,36,39,40,42,53,60,64]);
-  // The following arrays encode only the non-identity MIDI drum-note correspondences.
   const drumMaps = {
     36: [24,25,26,35,36,35,39,39,38,38,37,42,46,51,41,43,48,50,56,80,32],
     39: [24,25,26,27,28,29,30,35,40,42,38,38,52],
@@ -156,7 +155,8 @@
     const tempoTimes=samplingTimes([tempo],end),tempoPoints=tempoTimes.map(t=>({time:t,bpm:Math.round(tempo.at(t))}));
     let duration=0;
     for(let i=0;i<tempoPoints.length;i++)duration+=((tempoPoints[i+1]?.time??end)-tempoPoints[i].time)*15/tempoPoints[i].bpm;
-    if(duration>600)fail('máximo 10 minutos para importación remota');
+    if(duration>MAX_REMOTE_DURATION)fail('máximo 60 minutos para importación remota');
+    if(duration>600)warnings.add('Secuencia remota de más de 10 minutos; la carga y el inicio pueden tardar más en equipos lentos.');
     const tracks=[],ids=[...new Set(audible.map(n=>n.instrument))],melodic=Array.from({length:32},(_,i)=>i).filter(i=>i%16!==9);
     const mergeDrums=ids.filter(id=>drumIds.has(id%10000)).length>2;
     if(ids.length>128)fail('más de 128 pistas de origen');
@@ -198,14 +198,13 @@
         if(drum) {
           const mapping=drumMaps[base];
           if(mapping) { if(pitch>=24&&pitch<24+mapping.length)pitch=mapping[pitch-24]; }
-          else pitch+=12; // OS default drum export uses MIDI C0=12; custom kits have their own map.
+          else pitch+=12;
         }
         if(!drum)pitch+=Math.round(tuning.at(n.time)/100);
         if(pitch<0||pitch>127){warnings.add('Se omitieron notas fuera del rango MIDI.');continue;}
         const rawVelocity=Math.round(n.volume*50*(drum&&mergeDrums?globalVolume.at(n.time)*vol.at(n.time):peakScale));if(rawVelocity<=0)continue;if(rawVelocity>127)clipped++;
         const velocity=clamp(rawVelocity,1,127);
         add(n.time,[144|c,pitch,velocity],2);
-        // Off-before-on at a shared timestamp; preserve sub-tick short notes.
         add(Math.max(n.time+n.length,n.time+4/PPQ),[128|c,pitch,0],1);noteCount++;
       }
       if(tuning.points.length>1||s.detune%100)warnings.add('La afinación se redondea al semitono en cada inicio de nota.');
@@ -228,6 +227,6 @@
     for(const chunk of chunks){output.set([77,84,114,107],at);view.setUint32(at+4,chunk.length);output.set(chunk,at+8);at+=8+chunk.length;}
     return {bytes:output,report:{version:VERSION,noteCount,sourceNotes:seq.notes.length,instruments:ids.length,bpm:seq.bpm,duration,markers:seq.markers.length,warnings:[...warnings]}};
   }
-  const api={VERSION,MAX_BYTES,decode,encodeMidi,convert:(bytes,metadata)=>encodeMidi(decode(bytes),metadata)};
+  const api={VERSION,MAX_BYTES,MAX_REMOTE_DURATION,decode,encodeMidi,convert:(bytes,metadata)=>encodeMidi(decode(bytes),metadata)};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.JSSCCSequenceCodec=Object.freeze(api);
 })(globalThis);

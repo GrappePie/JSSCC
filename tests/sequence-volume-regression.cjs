@@ -7,9 +7,9 @@ function varint(n){const out=[];do{let b=n&127;n>>>=7;if(n)b|=128;out.push(b);}w
 function fieldVarint(field,n){return [(field<<3)|0,...varint(n)];}
 function fieldFloat(field,n){const b=Buffer.alloc(4);b.writeFloatLE(n);return [(field<<3)|5,...b];}
 function fieldChunk(field,bytes){return [(field<<3)|2,...varint(bytes.length),...bytes];}
-function sequenceWithVolume(volume){
-  const settings=[...fieldVarint(1,120),...fieldVarint(2,4)];
-  const note=[...fieldVarint(1,60),...fieldFloat(2,0),...fieldFloat(3,4),...fieldVarint(4,0),...fieldFloat(5,volume)];
+function sequenceWithVolume(volume,{time=0,length=4,bpm=120}={}){
+  const settings=[...fieldVarint(1,bpm),...fieldVarint(2,4)];
+  const note=[...fieldVarint(1,60),...fieldFloat(2,time),...fieldFloat(3,length),...fieldVarint(4,0),...fieldFloat(5,volume)];
   return Uint8Array.from([...fieldChunk(1,settings),...fieldChunk(2,note)]);
 }
 
@@ -30,4 +30,15 @@ test('legacy Online Sequencer note intensities above 4 are accepted and clamped 
 test('non-finite or negative note intensity remains rejected',()=>{
   assert.throws(()=>codec.decode(sequenceWithVolume(-1)),/intensidad fuera de rango/);
   assert.throws(()=>codec.decode(sequenceWithVolume(Number.NaN)),/intensidad fuera de rango/);
+});
+
+test('remote sequences longer than 10 minutes are accepted up to the 60 minute safety cap',()=>{
+  const result=codec.convert(sequenceWithVolume(1,{length:5200}),{id:999,title:'long fixture'});
+  assert.ok(result.report.duration>600);
+  assert.ok(result.report.duration<codec.MAX_REMOTE_DURATION);
+  assert.ok(result.report.warnings.some(x=>x.includes('más de 10 minutos')));
+});
+
+test('remote sequences beyond 60 minutes still reject explicitly',()=>{
+  assert.throws(()=>codec.convert(sequenceWithVolume(1,{length:30000})),/máximo 60 minutos/);
 });
