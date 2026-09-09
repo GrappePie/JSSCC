@@ -1,6 +1,6 @@
 # JSSCC — PCM Edition
 
-**v0.2.0 · Experimental · maintained by GrappePie**
+**v0.3.0 · Experimental · maintained by GrappePie**
 
 A browser MIDI-to-chiptune player derived from JSSCC, with an independently written experimental integer PCM engine informed by measurements of Gashisoft GXSCC B236E. This is not an official Gashisoft release, nor a claim of complete emulation.
 
@@ -12,11 +12,15 @@ Drop a `.mid`/`.midi` file or choose **Cargar MIDI**, then press Play. The brows
 
 The retro UI has live voice-count colors, envelope/output readings and timing fields. BUFFER WEB reports observed audio-heartbeat continuity, not the original Windows queue occupancy.
 
-## Online Sequencer: click and play
+## Online Sequencer: catalog + click and play
 
-Press **OS / Online Sequencer**, then **Escuchar chiptune** on a card. Public sequence data is downloaded into memory through our bounded JSSCC Sequence Bridge, independently converted from protobuf to Standard MIDI in a Web Worker, and automatically synthesized by the existing player. The primary action never opens a file picker or saves a download. Importing a local MIDI is a separate secondary option. Cancelling or closing the drawer cancels pending playback. Conversion warnings remain visible beside the source link.
+Press **OS / Online Sequencer** and search by title/author. JSSCC first looks for the optional **OS Browser Bridge** extension. When installed, the extension performs the official catalog search through your normal browser session in an inactive Online Sequencer tab, returns only result metadata, closes the temporary tab, and JSSCC renders the cards in its own palette. Sort controls include Newest, Popular, Most Notes and Longest; date controls include Today, This week, This month and All time.
 
-The bundled cards remain selected links checked on 2026-09-08, **not a live catalog**. Title/author metadata is from that selection or supplied by the user; arbitrary added URLs are not automatically given verified metadata. There is no official partnership or endorsement.
+The extension is optional. Without it, JSSCC retains the bounded server-side catalog attempt and the exact official-search fallback. The extension does not bypass verification pages or anti-bot challenges: if Online Sequencer asks you to verify the browser, open the site normally and complete that check yourself. Install instructions are in [`extensions/os-browser-bridge`](extensions/os-browser-bridge/README.md).
+
+On any card, **Escuchar chiptune** downloads that public sequence into memory through our bounded JSSCC Sequence Bridge, independently converts protobuf to Standard MIDI in a Web Worker, and automatically synthesizes it with the existing PCM player. The primary action never opens a file picker or saves a song download. Importing a local MIDI is a separate secondary option. Cancelling or closing the drawer cancels pending playback. Conversion warnings remain visible beside the source link.
+
+The six bundled cards remain selected links checked on 2026-09-08, not a claim of a mirrored catalog. There is no official partnership or endorsement.
 
 On-demand backend: `https://jsscc-sequence-bridge.lovable.app/api/public/sequence-bridge`. Only numerical Online Sequencer IDs are accepted, never arbitrary URLs. The auxiliary service is hosted in the owner's connected Lovable workspace, using its included resources; hosting has usage limits, not unlimited free availability. There is no account/login requirement in the player. Song bytes are not stored in localStorage, committed to this repository, or placed in downloads; short-lived caches exist in memory. Opening the library alone never requests song data. Remote thumbnails remain opt-in.
 
