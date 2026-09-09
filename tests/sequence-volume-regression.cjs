@@ -39,6 +39,16 @@ test('remote sequences longer than 10 minutes are accepted up to the 60 minute s
   assert.ok(result.report.warnings.some(x=>x.includes('más de 10 minutos')));
 });
 
+test('high-tempo remote sequence units above the legacy 100000 cap are accepted when wall-clock duration is under 60 minutes',()=>{
+  assert.ok(codec.MAX_SEQUENCE_UNITS>100000);
+  const input=sequenceWithVolume(1,{length:150000,bpm:999});
+  const decoded=codec.decode(input);
+  assert.equal(decoded.notes[0].length,150000);
+  const result=codec.convert(input,{id:1000,title:'high tempo long units'});
+  assert.ok(result.report.duration>600);
+  assert.ok(result.report.duration<codec.MAX_REMOTE_DURATION);
+});
+
 test('remote sequences beyond 60 minutes still reject explicitly',()=>{
   assert.throws(()=>codec.convert(sequenceWithVolume(1,{length:30000})),/máximo 60 minutos/);
 });
