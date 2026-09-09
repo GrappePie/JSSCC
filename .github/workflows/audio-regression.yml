@@ -31,7 +31,7 @@ jobs:
           git rev-parse HEAD > test-results/commit.txt
           git archive --format=zip HEAD js assets css index.html credits.html README.md src tests tools docs .github/workflows/audio-regression.yml > test-results/tested-source.zip
       - name: Run required Node regression suite
-        run: node --test tests/regressions.cjs | tee test-results/node-tests.txt
+        run: node --test tests/regressions.cjs tests/large-midi-overflow-regression.cjs | tee test-results/node-tests.txt
       - name: Test integer PCM kernel, 992 native prefixes and state-conditioned chords
         run: node --test tests/pcm-regressions.cjs tests/pcm-polyphony.cjs | tee test-results/pcm-node-tests.txt
       - name: Test read-only UI meters and unchanged PCM
