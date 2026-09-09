@@ -53,9 +53,9 @@ with sync_playwright()as p:
   page.click('#jsscc-stop');page.wait_for_function('ui.song.buffer===0 && ui.song.channels.every(c=>c.poly===0&&c.polyDisplay===0&&c.output===0&&c.freq===0)')
   check('Stop clears lamps, output, frequency and flow status',True)
   check('buffer measurement meaning is visible, not an invented Windows queue',page.locator('#jsscc-buffer-help').inner_text().find('no es la cola de Windows')>=0)
-  # A completely new tune must reset displayed program/bank/control history.
-  page.set_input_files('#jsscc-file',{'name':'fresh-ui-probe.mid','mimeType':'audio/midi','buffer':midi});page.wait_for_timeout(100)
-  check('file replacement starts with clean metering',page.evaluate('ui.song.channels[0].cc0===0 && ui.song.channels[0].poly===0 && ui.song.buffer===0'))
+  # A completely new tune now autoplays by default from the main file picker.
+  page.set_input_files('#jsscc-file',{'name':'fresh-ui-probe.mid','mimeType':'audio/midi','buffer':midi});page.wait_for_function("ui.song.fileName==='fresh-ui-probe.mid' && JSSCCMidi.diagnostics().state==='playing'",timeout=12000)
+  check('file replacement autoplays the fresh MIDI',True)
   # All native levels, including the six-plus cap, using actual simultaneous voices.
   colors_track=[0,255,81,3,7,161,32]
   for channel in range(1,8):
