@@ -4,8 +4,11 @@ const JSSCC_PREFIX='https://grappepie.github.io/JSSCC/';
 function officialSearchUrl(query,{page=1,sort='newest',range='all',scope='all'}={}){
   const u=new URL('https://onlinesequencer.net/sequences');
   u.searchParams.set('search',String(query||'').slice(0,120));
-  const sortMap={newest:'1',oldest:'2',popular:'3',notes:'4',longest:'5'};
-  const dateMap={today:'0',week:'1',month:'2',all:'4'};
+  // Verified against the live Online Sequencer catalog links on 2026-09-08.
+  // sort: 1 newest, 2 popular, 3 most notes, 4 oldest, 5 longest.
+  // date: 1 today, 2 this week, 3 this month, 4 all time.
+  const sortMap={newest:'1',popular:'2',notes:'3',oldest:'4',longest:'5'};
+  const dateMap={today:'1',week:'2',month:'3',all:'4'};
   u.searchParams.set('sort',sortMap[sort]||'1');
   u.searchParams.set('date',dateMap[range]||'4');
   u.searchParams.set('type',scope==='featured'?'1':scope==='registered'?'2':'3');
