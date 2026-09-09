@@ -4,7 +4,6 @@ const JSSCC_PREFIX='https://grappepie.github.io/JSSCC/';
 function officialSearchUrl(query,{page=1,sort='newest',range='all',scope='all'}={}){
   const u=new URL('https://onlinesequencer.net/sequences');
   u.searchParams.set('search',String(query||'').slice(0,120));
-  // Keep compatibility with the official catalog query style currently used by JSSCC.
   const sortMap={newest:'1',oldest:'2',popular:'3',notes:'4',longest:'5'};
   const dateMap={today:'0',week:'1',month:'2',all:'4'};
   u.searchParams.set('sort',sortMap[sort]||'1');
@@ -52,8 +51,11 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type!=='JSSCC_OS_SEARCH')return;
   const senderUrl=sender.tab?.url||sender.url||'';
   if(!senderUrl.startsWith(JSSCC_PREFIX)){
-    sendResponse(Promise.reject(new Error('Origen no permitido')));return true;
+    sendResponse({ok:false,error:'Origen no permitido'});return;
   }
-  search(message.payload).then(sendResponse,error=>sendResponse(Promise.reject(error)));
+  search(message.payload).then(
+    payload=>sendResponse({ok:true,payload}),
+    error=>sendResponse({ok:false,error:error?.message||'No se pudo consultar Online Sequencer'})
+  );
   return true;
 });
