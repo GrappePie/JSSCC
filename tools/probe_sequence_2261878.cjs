@@ -11,7 +11,9 @@ const endpoint='https://jsscc-sequence-bridge.lovable.app/api/public/sequence-br
   if(!res.ok){result.errorText=new TextDecoder().decode(body).slice(0,2000);console.log(JSON.stringify(result,null,2));process.exitCode=1;return;}
   try{
     const decoded=codec.decode(body);
-    result.decode={notes:decoded.notes.length,markers:decoded.markers.length,instruments:decoded.instruments.size,bpm:decoded.bpm,timeSignature:decoded.timeSignature,unknownFields:decoded.unknownFields,effects:decoded.effects};
+    const noteVolumes=decoded.notes.map(n=>n.volume);
+    const instrumentVolumes=[...decoded.instruments.values()].map(x=>x.volume);
+    result.decode={notes:decoded.notes.length,markers:decoded.markers.length,instruments:decoded.instruments.size,bpm:decoded.bpm,timeSignature:decoded.timeSignature,unknownFields:decoded.unknownFields,effects:decoded.effects,minNoteVolume:Math.min(...noteVolumes),maxNoteVolume:Math.max(...noteVolumes),globalVolume:decoded.volume,minInstrumentVolume:instrumentVolumes.length?Math.min(...instrumentVolumes):null,maxInstrumentVolume:instrumentVolumes.length?Math.max(...instrumentVolumes):null};
     const converted=codec.encodeMidi(decoded,{id:Number(id),title:'Cocoa Cave - Kirby Super Star'});
     result.convert={bytes:converted.bytes.length,report:converted.report};
     fs.writeFileSync('test-results/2261878.mid',converted.bytes);
