@@ -5,6 +5,7 @@ test('browser bridge intercepts catalog fetch when input is a URL object',async(
   const source=fs.readFileSync(path.join(root,'js/os-browser-bridge.js'),'utf8');
   const messages=[];
   const listeners={};
+  const fakeDocument={readyState:'loading',addEventListener:()=>{}};
   const fakeWindow={
     location:{href:'https://grappepie.github.io/JSSCC/',origin:'https://grappepie.github.io'},
     fetch:async()=>{throw new Error('original fetch should not run for catalog URL object');},
@@ -14,10 +15,10 @@ test('browser bridge intercepts catalog fetch when input is a URL object',async(
       if(data.type==='PING')setImmediate(()=>listeners.message({source:fakeWindow,origin:fakeWindow.location.origin,data:{source:'JSSCC_OS_BRIDGE',requestId:data.requestId,ok:true,payload:{version:'0.1.2'}}}));
       if(data.type==='SEARCH')setImmediate(()=>listeners.message({source:fakeWindow,origin:fakeWindow.location.origin,data:{source:'JSSCC_OS_BRIDGE',requestId:data.requestId,ok:true,payload:{results:[{id:'1',title:'x'}],count:1}}}));
     },
-    setTimeout,clearTimeout,URL,Response,Event,document:{readyState:'loading',addEventListener:()=>{}},console
+    setTimeout,clearTimeout,URL,Response,Event,document:fakeDocument,console
   };
   fakeWindow.window=fakeWindow;
-  vm.runInNewContext(source,{window:fakeWindow,globalThis:fakeWindow,URL,Response,setTimeout,clearTimeout,Event,console});
+  vm.runInNewContext(source,{window:fakeWindow,globalThis:fakeWindow,document:fakeDocument,URL,Response,setTimeout,clearTimeout,setImmediate,Event,console});
   const u=new URL('https://jsscc-sequence-bridge.lovable.app/api/public/sequence-search?q=kirby&page=1');
   const res=await fakeWindow.fetch(u,{headers:{Accept:'application/json'}});
   assert.equal(res.status,200);
