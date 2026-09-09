@@ -16,6 +16,12 @@
   let sequence=0,lastSeen=0,lastVersion=null;
 
   function id(){return 'osb-'+Date.now().toString(36)+'-'+(++sequence).toString(36)+'-'+Math.random().toString(36).slice(2,8);}
+  function inputUrl(input){
+    if(typeof input==='string')return input;
+    if(input instanceof URL)return input.href;
+    if(input&&typeof input.url==='string')return input.url;
+    return String(input||'');
+  }
   function send(type,payload={},timeout=1200){
     const requestId=id();
     return new Promise((resolve,reject)=>{
@@ -43,11 +49,11 @@
     return out;
   }
   function isCatalogSearch(input){
-    try{const u=new URL(typeof input==='string'?input:input.url,root.location.href);return u.href.startsWith(SEARCH_ENDPOINT);}catch(_){return false;}
+    try{const u=new URL(inputUrl(input),root.location.href);return u.href.startsWith(SEARCH_ENDPOINT);}catch(_){return false;}
   }
   root.fetch=async function(input,init){
     if(!isCatalogSearch(input))return originalFetch(input,init);
-    let u;try{u=new URL(typeof input==='string'?input:input.url,root.location.href);}catch(_){return originalFetch(input,init);}
+    let u;try{u=new URL(inputUrl(input),root.location.href);}catch(_){return originalFetch(input,init);}
     const params={
       q:(u.searchParams.get('q')||'').slice(0,120),
       page:Math.max(1,Math.min(20,Number(u.searchParams.get('page'))||1)),
