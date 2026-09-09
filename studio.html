@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JSSCC Studio — Composer & Community</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="stylesheet" href="./css/studio.css?v=studio-1">
+  <link rel="stylesheet" href="./css/studio.css?v=studio-2">
 </head>
 <body>
   <header class="topbar">
@@ -24,63 +24,114 @@
       <aside class="left-panel panel">
         <h2>PROYECTO</h2>
         <button id="newProjectBtn">＋ Nuevo</button>
-        <button id="saveProjectBtn">▣ Guardar</button>
+        <button id="saveProjectBtn">▣ Guardar <span class="shortcut">Ctrl S</span></button>
         <button id="duplicateProjectBtn">⧉ Duplicar</button>
         <button id="exportMidiBtn">⇩ Exportar MIDI</button>
         <button id="publishBtn" class="accent">⌁ Publicar</button>
         <hr>
-        <h2>HERRAMIENTAS</h2>
-        <button class="tool active" data-tool="paint">✎ Pintar notas</button>
-        <button class="tool" data-tool="erase">⌫ Borrar</button>
-        <button class="tool" data-tool="select">⌗ Seleccionar</button>
-        <button id="undoBtn">↶ Deshacer</button>
-        <button id="redoBtn">↷ Rehacer</button>
-        <hr>
+        <h2>MÚSICA</h2>
         <label>Escala<select id="scaleSelect"><option>Chromatic</option><option>C Major</option><option>C Minor</option><option>D Minor</option><option>E Minor</option><option>F Major</option><option>G Major</option><option>A Minor</option></select></label>
-        <label class="check"><input id="lockScale" type="checkbox"> Bloquear a escala</label>
-        <label>Cuadrícula<select id="gridSelect"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></label>
+        <label class="check"><input id="lockScale" type="checkbox"> Bloquear notas a la escala</label>
+        <label>Snap de cuadrícula<select id="gridSelect"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></label>
+        <hr>
+        <h2>ATAJOS</h2>
+        <div class="shortcut-list">
+          <div><kbd>P</kbd><span>Pintar</span></div><div><kbd>V</kbd><span>Seleccionar / mover</span></div><div><kbd>E</kbd><span>Borrar</span></div>
+          <div><kbd>Space</kbd><span>Play / pausa</span></div><div><kbd>Del</kbd><span>Eliminar selección</span></div><div><kbd>Ctrl D</kbd><span>Duplicar notas</span></div>
+        </div>
       </aside>
 
       <section class="workspace panel">
         <div class="transport">
-          <button id="playBtn" class="play">▶</button>
-          <button id="stopBtn">■</button>
-          <button id="loopBtn" class="toggle active">↻ LOOP</button>
+          <button id="playBtn" class="play" aria-label="Reproducir">▶</button>
+          <button id="stopBtn" aria-label="Detener">■</button>
+          <button id="loopBtn" class="toggle active" aria-pressed="true">↻ LOOP</button>
           <label>BPM <input id="bpmInput" type="number" min="20" max="400" value="120"></label>
           <label>Compases <input id="barsInput" type="number" min="1" max="32" value="4"></label>
           <span id="timeLabel">00:00 / 00:08</span>
         </div>
+
         <div class="project-title-row">
-          <input id="titleInput" value="Nueva canción" maxlength="100" aria-label="Título">
-          <span id="saveState">sin guardar</span>
+          <div class="project-name-wrap">
+            <input id="titleInput" value="Nueva canción" maxlength="100" aria-label="Título">
+            <small id="projectBreadcrumb">Patrón A · Pulse 1</small>
+          </div>
+          <span id="saveState" class="save-state">guardado local automático</span>
         </div>
+
+        <div class="editor-toolbar" role="toolbar" aria-label="Herramientas de edición">
+          <div class="tool-group primary-tools">
+            <button class="tool" data-tool="select" title="Seleccionar y mover (V)" aria-label="Seleccionar y mover"><span>⌖</span><em>Seleccionar</em><kbd>V</kbd></button>
+            <button class="tool active" data-tool="paint" title="Pintar notas (P)" aria-label="Pintar notas"><span>✎</span><em>Pintar</em><kbd>P</kbd></button>
+            <button class="tool" data-tool="erase" title="Borrar notas (E)" aria-label="Borrar notas"><span>⌫</span><em>Borrar</em><kbd>E</kbd></button>
+          </div>
+          <span class="toolbar-separator"></span>
+          <label class="compact-control">Duración
+            <select id="noteLengthSelect">
+              <option value="0.5">1/32</option><option value="1" selected>1/16</option><option value="2">1/8</option><option value="4">1/4</option><option value="8">1/2</option><option value="16">1 compás</option>
+            </select>
+          </label>
+          <label class="compact-control velocity-control">Velocity
+            <input id="noteVelocity" type="range" min="1" max="127" value="96"><output id="noteVelocityValue">96</output>
+          </label>
+          <span class="toolbar-separator"></span>
+          <div class="selection-actions" aria-label="Acciones de selección">
+            <button id="copyNotesBtn" title="Copiar (Ctrl+C)" disabled>⧉ Copiar</button>
+            <button id="pasteNotesBtn" title="Pegar (Ctrl+V)" disabled>▣ Pegar</button>
+            <button id="duplicateNotesBtn" title="Duplicar (Ctrl+D)" disabled>＋ Dup.</button>
+            <button id="deleteNotesBtn" title="Eliminar (Delete)" disabled>⌫</button>
+          </div>
+          <button id="helpBtn" class="help-button" title="Ayuda y atajos">?</button>
+        </div>
+
         <div class="pattern-tabs" id="patternTabs"></div>
-        <div class="roll-wrap">
+        <div class="roll-wrap" id="rollWrap">
           <div class="track-heads" id="trackHeads"></div>
-          <div class="piano-roll" id="pianoRoll" aria-label="Piano roll"></div>
+          <div class="piano-scroll" id="pianoScroll">
+            <div class="piano-roll tool-paint" id="pianoRoll" aria-label="Piano roll" tabindex="0"></div>
+          </div>
+          <div id="rollHint" class="roll-hint"><strong>Empieza pintando una nota</strong><span>Haz clic o arrastra sobre la cuadrícula · cambia de herramienta con P / V / E</span></div>
         </div>
         <div class="keyboard" id="keyboard"></div>
+        <div class="editor-status" aria-live="polite">
+          <span id="toolHint">Pintar · arrastra para crear notas</span>
+          <span id="cursorStatus">—</span>
+          <span id="selectionStatus">0 notas seleccionadas</span>
+        </div>
       </section>
 
       <aside class="right-panel panel">
-        <h2>INSTRUMENTO</h2>
-        <select id="instrumentSelect"><option value="square">Pulse / Square</option><option value="triangle">Triangle</option><option value="saw">Saw</option><option value="noise">Noise</option></select>
-        <label>Volumen <input id="trackVolume" type="range" min="0" max="100" value="85"></label>
-        <label>Octava <input id="octaveInput" type="number" min="1" max="7" value="4"></label>
+        <section id="selectionInspector" class="inspector-section" hidden>
+          <h2>SELECCIÓN <span id="selectedCountBadge" class="count-badge">0</span></h2>
+          <label>Duración
+            <select id="selectionLength"><option value="keep">— conservar —</option><option value="0.5">1/32</option><option value="1">1/16</option><option value="2">1/8</option><option value="4">1/4</option><option value="8">1/2</option><option value="16">1 compás</option></select>
+          </label>
+          <label>Velocity <input id="selectionVelocity" type="range" min="1" max="127" value="96"><output id="selectionVelocityValue">96</output></label>
+          <div class="inspector-actions"><button id="quantizeBtn">⌗ Quantize</button><button id="inspectorDuplicateBtn">⧉ Duplicar</button><button id="inspectorDeleteBtn">⌫ Borrar</button></div>
+          <hr>
+        </section>
+
+        <h2>PISTA</h2>
+        <div class="track-name" id="selectedTrackName">PULSE 1</div>
+        <label>Instrumento<select id="instrumentSelect"><option value="square">Pulse / Square</option><option value="triangle">Triangle</option><option value="saw">Saw</option><option value="noise">Noise</option></select></label>
+        <label>Volumen <input id="trackVolume" type="range" min="0" max="100" value="85"><output id="trackVolumeValue">85</output></label>
+        <label>Octava visible <input id="octaveInput" type="number" min="1" max="7" value="4"></label>
         <hr>
         <h2>PATRONES</h2>
         <div id="patternList"></div>
         <button id="addPatternBtn">＋ Añadir patrón</button>
         <hr>
-        <h2>ESTRUCTURA</h2>
+        <h2>ESTRUCTURA DE CANCIÓN</h2>
         <div id="songStructure" class="structure"></div>
-        <button id="appendPatternBtn">＋ Añadir al final</button>
+        <button id="appendPatternBtn">＋ Añadir patrón actual</button>
         <hr>
-        <h2>UTILIDADES</h2>
-        <button id="generateBassBtn">♫ Generar bajo</button>
-        <button id="generateDrumsBtn">♩ Generar batería</button>
-        <button id="arpeggiateBtn">⌁ Arpegiar</button>
-        <button id="humanizeBtn">✦ Humanizar</button>
+        <details class="utilities" open>
+          <summary>UTILIDADES</summary>
+          <button id="generateBassBtn">♫ Generar bajo</button>
+          <button id="generateDrumsBtn">♩ Generar batería</button>
+          <button id="arpeggiateBtn">⌁ Arpegiar</button>
+          <button id="humanizeBtn">✦ Humanizar</button>
+        </details>
       </aside>
     </section>
 
@@ -121,8 +172,23 @@
     </article>
   </dialog>
 
-  <script src="./js/midi-writer.js?v=studio-1"></script>
+  <dialog id="helpDialog">
+    <article class="dialog-card help-dialog">
+      <button id="closeHelpDialog" class="dialog-close">×</button>
+      <h2>EDITAR SIN PELEARTE CON LAS HERRAMIENTAS</h2>
+      <div class="help-grid">
+        <section><h3>✎ Pintar <kbd>P</kbd></h3><p>Clic o arrastra para crear notas. La duración y velocity nuevas se toman de la barra superior.</p></section>
+        <section><h3>⌖ Seleccionar <kbd>V</kbd></h3><p>Arrastra en un espacio vacío para hacer una caja. Arrastra una nota seleccionada para mover todo el grupo.</p></section>
+        <section><h3>⌫ Borrar <kbd>E</kbd></h3><p>Arrastra por encima de las notas para borrarlas. Clic derecho también borra una nota sin cambiar de herramienta.</p></section>
+        <section><h3>↔ Duración</h3><p>En Seleccionar, arrastra el asa del borde derecho de una nota para alargarla o acortarla respetando el snap.</p></section>
+      </div>
+      <p class="help-shortcuts"><kbd>Shift</kbd> añade/quita de la selección · <kbd>Ctrl C</kbd>/<kbd>Ctrl V</kbd> copiar/pegar · <kbd>Ctrl D</kbd> duplicar · <kbd>Delete</kbd> borrar · <kbd>Ctrl Z</kbd>/<kbd>Ctrl Y</kbd> deshacer/rehacer · <kbd>Space</kbd> play/pausa.</p>
+    </article>
+  </dialog>
+
+  <script src="./js/midi-writer.js?v=studio-2"></script>
+  <script src="./js/studio-editing.js?v=studio-2"></script>
   <script src="./js/community-adapter.js?v=studio-1"></script>
-  <script src="./js/studio.js?v=studio-1"></script>
+  <script src="./js/studio.js?v=studio-2"></script>
 </body>
 </html>
