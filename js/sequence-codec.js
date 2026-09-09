@@ -7,6 +7,9 @@
   'use strict';
   const VERSION = 'os-midi-20260908.2', MAX_BYTES = 4 * 1024 * 1024;
   const MAX_NOTES = 100000, MAX_MARKERS = 12000, MAX_EVENTS = 300000, PPQ = 960, MAX_REMOTE_DURATION = 3600;
+  // Online Sequencer stores musical time in quarter-sixteenth units. Keep the
+  // raw-unit guard consistent with the 60 minute wall-clock cap at max tempo.
+  const MAX_SEQUENCE_UNITS = Math.ceil(MAX_REMOTE_DURATION * 999 / 15);
   const programs = [5,26,1,91,28,34,85,104,1,61,58,41,43,81,81,82,81,7,47,14,46,115,105,74,67,4,11,39,20,37,89,119,27,108,12,29,1,39,31,1,1,1,1,6,31,43,41,49,33,28,61,58,91,1,34,91,40,91,25,53,1,62,3,20,0];
   const drumIds = new Set([2,31,36,39,40,42,53,60,64]);
   const drumMaps = {
@@ -109,13 +112,13 @@
     finite(result.bpm,'tempo',10,999);finite(result.volume,'volumen global',0,Number.MAX_VALUE);
     finite(result.timeSignature,'compás',1,32);
     for(const n of result.notes) {
-      finite(n.pitch,'nota',0,127);finite(n.time,'inicio',0,100000);finite(n.length,'duración',0,100000);
+      finite(n.pitch,'nota',0,127);finite(n.time,'inicio',0,MAX_SEQUENCE_UNITS);finite(n.length,'duración',0,MAX_SEQUENCE_UNITS);
       finite(n.instrument,'instrumento',0,0x7fffffff);finite(n.volume,'intensidad',0,Number.MAX_VALUE);
     }
     for(const [id,s] of result.instruments) {
       finite(s.volume,'volumen del instrumento '+id,0,Number.MAX_VALUE);finite(s.pan,'panorama',-1,1);finite(s.detune,'afinación',-12000,12000);
     }
-    for(const m of result.markers){finite(m.time,'tiempo de automatización',0,100000);finite(m.value,'automatización',-12000,12000);}
+    for(const m of result.markers){finite(m.time,'tiempo de automatización',0,MAX_SEQUENCE_UNITS);finite(m.value,'automatización',-12000,12000);}
     return result;
   }
   function curve(initial, markers, min, max) {
@@ -149,7 +152,7 @@
     const warnings=new Set(),audible=seq.notes.filter(n=>n.volume>0&&n.length>0);
     if(!audible.length)fail('no contiene notas audibles');
     const end=audible.reduce((v,n)=>Math.max(v,n.time+n.length),0);
-    if(end>40000)fail('la secuencia es demasiado larga');
+    if(end>MAX_SEQUENCE_UNITS)fail('la secuencia es demasiado larga');
     const by=(setting,id)=>seq.markers.filter(m=>m.setting===setting&&(id===undefined||m.instrument===id));
     const tempo=curve(seq.bpm,by(0),10,999),globalVolume=curve(seq.volume,by(8),0,Number.MAX_VALUE);
     const tempoTimes=samplingTimes([tempo],end),tempoPoints=tempoTimes.map(t=>({time:t,bpm:Math.round(tempo.at(t))}));
@@ -227,6 +230,6 @@
     for(const chunk of chunks){output.set([77,84,114,107],at);view.setUint32(at+4,chunk.length);output.set(chunk,at+8);at+=8+chunk.length;}
     return {bytes:output,report:{version:VERSION,noteCount,sourceNotes:seq.notes.length,instruments:ids.length,bpm:seq.bpm,duration,markers:seq.markers.length,warnings:[...warnings]}};
   }
-  const api={VERSION,MAX_BYTES,MAX_REMOTE_DURATION,decode,encodeMidi,convert:(bytes,metadata)=>encodeMidi(decode(bytes),metadata)};
+  const api={VERSION,MAX_BYTES,MAX_REMOTE_DURATION,MAX_SEQUENCE_UNITS,decode,encodeMidi,convert:(bytes,metadata)=>encodeMidi(decode(bytes),metadata)};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.JSSCCSequenceCodec=Object.freeze(api);
 })(globalThis);
