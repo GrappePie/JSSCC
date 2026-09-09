@@ -11,6 +11,39 @@ function candidateContainer(anchor){
   }
   return best;
 }
+function safeThumbnail(value){
+  if(!value)return '';
+  try{
+    const u=new URL(String(value).trim(),location.href);
+    if(u.protocol!=='https:'||u.origin!=='https://onlinesequencer.net'||u.search||u.hash)return '';
+    if(!/^\/t\/\d+\/[\w.-]+\.(?:gif|png|jpe?g|webp)$/i.test(u.pathname))return '';
+    return u.href;
+  }catch(_){return '';}
+}
+function srcsetUrls(value){
+  return String(value||'').split(',').map(x=>x.trim().split(/\s+/)[0]).filter(Boolean);
+}
+function cssUrls(value){
+  const out=[];const re=/url\((['"]?)(.*?)\1\)/gi;let m;
+  while((m=re.exec(String(value||''))))out.push(m[2]);
+  return out;
+}
+function findThumbnail(box){
+  const nodes=[box,...box.querySelectorAll('img,source,[style],[data-src],[data-original],[data-lazy-src],[data-background-image]')];
+  for(const node of nodes.slice(0,80)){
+    const candidates=[];
+    if(node.currentSrc)candidates.push(node.currentSrc);
+    if(node.src)candidates.push(node.src);
+    for(const attr of ['src','data-src','data-original','data-lazy-src','data-background-image']){
+      const value=node.getAttribute?.(attr);if(value)candidates.push(value);
+    }
+    for(const value of srcsetUrls(node.getAttribute?.('srcset')))candidates.push(value);
+    for(const value of cssUrls(node.getAttribute?.('style')))candidates.push(value);
+    try{for(const value of cssUrls(getComputedStyle(node).backgroundImage))candidates.push(value);}catch(_){}
+    for(const value of candidates){const safe=safeThumbnail(value);if(safe)return safe;}
+  }
+  return '';
+}
 function parseCard(anchor,id){
   const box=candidateContainer(anchor);
   const text=clean(box.innerText);
@@ -18,16 +51,13 @@ function parseCard(anchor,id){
   const title=rawTitle&&rawTitle!==id?rawTitle:('Sequence '+id);
   const authorMatch=text.match(/\bby\s+(.{1,80}?)(?=\s+\d{4}-\d{2}-\d{2}|\s+\d{1,2}:\d{2}|$)/i);
   const durationMatch=text.match(/(?:^|\s)(\d{1,2}:\d{2})(?:\s|$)/);
-  const img=box.querySelector('img');
-  let thumbnail='';
-  if(img){try{const u=new URL(img.currentSrc||img.src,location.href);if(u.protocol==='https:'&&u.hostname.endsWith('onlinesequencer.net'))thumbnail=u.href;}catch(_){}}
   return {
     id,
     title:title.slice(0,180),
     author:authorMatch?clean(authorMatch[1]).slice(0,100):'',
     duration:durationMatch?durationMatch[1]:'',
     info:text.slice(0,240),
-    thumbnail,
+    thumbnail:findThumbnail(box),
     url:'https://onlinesequencer.net/'+id
   };
 }
