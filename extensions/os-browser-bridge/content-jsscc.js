@@ -12,8 +12,9 @@ window.addEventListener('message',event=>{
     return;
   }
   if(data.type!=='SEARCH')return;
-  chrome.runtime.sendMessage({type:'JSSCC_OS_SEARCH',payload:data.payload||{}}).then(payload=>{
-    window.postMessage({source:EXT_SOURCE,requestId:data.requestId,ok:true,payload},location.origin);
+  chrome.runtime.sendMessage({type:'JSSCC_OS_SEARCH',payload:data.payload||{}}).then(response=>{
+    if(response?.ok)window.postMessage({source:EXT_SOURCE,requestId:data.requestId,ok:true,payload:response.payload||{}},location.origin);
+    else window.postMessage({source:EXT_SOURCE,requestId:data.requestId,ok:false,error:response?.error||'No se pudo consultar Online Sequencer'},location.origin);
   }).catch(error=>{
     window.postMessage({source:EXT_SOURCE,requestId:data.requestId,ok:false,error:error?.message||'No se pudo consultar Online Sequencer'},location.origin);
   });
