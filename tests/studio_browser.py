@@ -62,20 +62,29 @@ with sync_playwright() as pw:
   page.keyboard.press('Delete');page.wait_for_timeout(100)
   check('Delete removes current selection only',page.locator('.note-block').count()==1)
 
-  # Grid 1/32 must expose half-step cells and allow a note there.
+  # Grid 1/32 must expose half-step cells and paint a true one-cell 1/32 note by default.
   page.select_option('#gridSelect','32');page.wait_for_timeout(100)
   check('1/32 grid renders fractional half-step cells',page.locator('.cell[data-step="0.5"]').count()>0)
+  check('Switching to 1/32 synchronizes default paint duration',page.locator('#noteLengthSelect').input_value()=='.5' or page.locator('#noteLengthSelect').input_value()=='0.5',page.locator('#noteLengthSelect').input_value())
   page.keyboard.press('p')
   half=page.locator('.cell[data-step="0.5"][data-pitch="62"]').first
   half.scroll_into_view_if_needed();hb=half.bounding_box();assert hb
   page.mouse.click(hb['x']+hb['width']/2,hb['y']+hb['height']/2);page.wait_for_timeout(100)
   check('Paint works at a fractional 1/32 position',page.locator('.note-block').count()==2)
+  painted=page.locator('.note-block').last
+  check('Painted 1/32 note reports 1/32 duration','1/32' in (painted.get_attribute('aria-label') or ''),painted.get_attribute('aria-label'))
+
+  # Adjacent 1/32 cells should accept adjacent notes instead of appearing to skip every other cell.
+  adjacent=page.locator('.cell[data-step="1"][data-pitch="62"]').first
+  adjacent.scroll_into_view_if_needed();ab=adjacent.bounding_box();assert ab
+  page.mouse.click(ab['x']+ab['width']/2,ab['y']+ab['height']/2);page.wait_for_timeout(100)
+  check('Adjacent 1/32 cell can be painted independently',page.locator('.note-block').count()==3)
 
   # Eraser should delete with the same direct pointer interaction.
   page.keyboard.press('e');page.wait_for_timeout(50)
   target=page.locator('.note-block').last;tb=target.bounding_box();assert tb
   page.mouse.click(tb['x']+max(2,tb['width']/2),tb['y']+tb['height']/2);page.wait_for_timeout(100)
-  check('Eraser removes a note directly',page.locator('.note-block').count()==1)
+  check('Eraser removes a note directly',page.locator('.note-block').count()==2)
 
   # Help and autosave feedback should be discoverable and quiet.
   page.click('#helpBtn');check('Help dialog opens',page.locator('#helpDialog[open]').count()==1);page.click('#closeHelpDialog')
