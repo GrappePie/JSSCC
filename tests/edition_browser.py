@@ -22,15 +22,16 @@ with sync_playwright() as p:
  try:
   page.goto(f'http://127.0.0.1:{server.server_port}/index.html',timeout=12000)
   page.wait_for_function('window.JSSCCEditionUI?.diagnostics().brandingReady && window.ui?.renderer?.loadEvents===0',timeout=12000)
-  check('new product identity is visible',page.title()=='JSSCC — PCM Edition · GrappePie' and 'v0.2.0' in page.locator('#jsscc-edition').inner_text())
-  check('canvas notices preserve upstream copyright and new version',page.evaluate("JSON.stringify(ui.renderer.loader.drawGroups).includes('(C) 2017 meme.institute + Milkey Mouse') && JSON.stringify(ui.renderer.loader.drawGroups).includes('PCM v0.2.0')"))
+  check('new product identity is visible',page.title()=='JSSCC — PCM Edition · GrappePie' and 'v0.2.1' in page.locator('#jsscc-edition').inner_text())
+  check('canvas notices preserve upstream copyright and new version',page.evaluate("JSON.stringify(ui.renderer.loader.drawGroups).includes('(C) 2017 meme.institute + Milkey Mouse') && JSON.stringify(ui.renderer.loader.drawGroups).includes('PCM v0.2.1')"))
   page.click('#jsscc-sequencer');page.wait_for_function("document.querySelectorAll('.edition-card').length===6")
   check('six real-reference cards appear in the drawer',page.locator('.edition-card').count()==6)
   check('selection is not passed off as live catalog or partnership','no es un catálogo en directo' in page.locator('#edition-network-note').inner_text() and 'no oficial' in page.locator('#edition-network-note').inner_text())
   check('no external requests before opt-in',len(external)==0,external)
   check('original-page links have safe targets',page.evaluate("Array.from(document.querySelectorAll('.edition-card>a')).every(a=>a.href.startsWith('https://onlinesequencer.net/')&&a.target==='_blank'&&a.rel.includes('noopener'))"))
   page.screenshot(path=str(OUT/'edition-library.png'),full_page=True)
-  page.fill('#edition-search','Boxx');check('local title-author search works',page.locator('.edition-card').count()==1)
+  # One-character queries intentionally remain a local fallback filter; two+ characters use the live-search layer.
+  page.fill('#edition-search','x');check('short local title-author filter remains available',page.locator('.edition-card').count()==1)
   page.fill('#edition-search','');
   page.fill('#edition-sequence-url','https://evil.test/555');page.locator('.edition-add-form button').click()
   check('untrusted URL is rejected',page.locator('#edition-feedback').get_attribute('data-error')=='true' and page.locator('.edition-card').count()==6)
@@ -58,7 +59,6 @@ with sync_playwright() as p:
   page.click('#jsscc-stop');page.wait_for_function("JSSCCMidi.diagnostics().state==='stopped'")
   page.click('#jsscc-sequencer');page.keyboard.press('Escape')
   check('Escape closes modal and restores focus',not page.locator('#jsscc-sequencer-dialog').is_visible() and page.locator('#jsscc-sequencer').evaluate('(e)=>document.activeElement===e'))
-  # Main import must clear the previously selected source association.
   page.set_input_files('#jsscc-file',{'name':'different.mid','mimeType':'audio/midi','buffer':midi});page.wait_for_function("document.querySelector('#jsscc-sequence-source').hidden")
   check('replacing MIDI elsewhere clears stale source credit',True)
   page.set_viewport_size({'width':390,'height':844});page.click('#jsscc-sequencer');page.wait_for_timeout(100)
