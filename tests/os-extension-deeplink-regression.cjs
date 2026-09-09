@@ -5,7 +5,7 @@ const root=path.join(__dirname,'..');
 test('extension adds Play Chiptune deep link on Online Sequencer sequence pages',()=>{
   const manifest=JSON.parse(fs.readFileSync(path.join(root,'extensions/os-browser-bridge/manifest.json'),'utf8'));
   const sequence=fs.readFileSync(path.join(root,'extensions/os-browser-bridge/content-sequence.js'),'utf8');
-  assert.equal(manifest.version,'0.1.4');
+  assert.equal(manifest.version,'0.1.5');
   assert.ok(manifest.content_scripts.some(x=>x.js?.includes('content-sequence.js')&&x.matches?.includes('https://onlinesequencer.net/*')));
   assert.match(sequence,/jsscc-play-chiptune/);
   assert.match(sequence,/searchParams\.set\('os',id\)/);
@@ -13,12 +13,14 @@ test('extension adds Play Chiptune deep link on Online Sequencer sequence pages'
   assert.match(sequence,/Play Chiptune/);
 });
 
-test('extension prefers sequence page metadata over generic Online Sequencer headings',()=>{
+test('extension prefers sequence page metadata and refreshes the deep link at click time',()=>{
   const sequence=fs.readFileSync(path.join(root,'extensions/os-browser-bridge/content-sequence.js'),'utf8');
   assert.match(sequence,/meta\[property="og:title"\]/);
   assert.match(sequence,/document\.title/);
   assert.match(sequence,/replace\(\/\^Online Sequencer\\s\*\[-\|:\]/);
-  assert.match(sequence,/for\(const node of document\.querySelectorAll\('\.sequence-title,\.title,h1,h2,h3'\)\)/);
+  assert.match(sequence,/const refreshDestination=\(\)=>\{a\.href=destination\(id\);\}/);
+  assert.match(sequence,/addEventListener\('pointerdown',refreshDestination\)/);
+  assert.match(sequence,/addEventListener\('click',refreshDestination\)/);
 });
 
 test('JSSCC deep link prepares a sequence and handles browser autoplay blocking',()=>{

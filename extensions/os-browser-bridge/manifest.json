@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JSSCC Online Sequencer Bridge",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Lets JSSCC search the Online Sequencer catalog through your normal browser session and adds Play Chiptune links to sequence pages.",
   "permissions": ["tabs"],
   "host_permissions": [
