@@ -5,7 +5,7 @@
  */
 (function (root) {
   'use strict';
-  const VERSION = 'os-midi-20260908.1', MAX_BYTES = 4 * 1024 * 1024;
+  const VERSION = 'os-midi-20260908.2', MAX_BYTES = 4 * 1024 * 1024;
   const MAX_NOTES = 100000, MAX_MARKERS = 12000, MAX_EVENTS = 300000, PPQ = 960;
   const programs = [5,26,1,91,28,34,85,104,1,61,58,41,43,81,81,82,81,7,47,14,46,115,105,74,67,4,11,39,20,37,89,119,27,108,12,29,1,39,31,1,1,1,1,6,31,43,41,49,33,28,61,58,91,1,34,91,40,91,25,53,1,62,3,20,0];
   const drumIds = new Set([2,31,36,39,40,42,53,60,64]);
@@ -107,14 +107,14 @@
       return true;
     });
     if(!hasSettings||!result.notes.length)fail('no contiene ajustes y notas compatibles');
-    finite(result.bpm,'tempo',10,999);finite(result.volume,'volumen global',0,2);
+    finite(result.bpm,'tempo',10,999);finite(result.volume,'volumen global',0,Number.MAX_VALUE);
     finite(result.timeSignature,'compás',1,32);
     for(const n of result.notes) {
       finite(n.pitch,'nota',0,127);finite(n.time,'inicio',0,100000);finite(n.length,'duración',0,100000);
-      finite(n.instrument,'instrumento',0,0x7fffffff);finite(n.volume,'intensidad',0,4);
+      finite(n.instrument,'instrumento',0,0x7fffffff);finite(n.volume,'intensidad',0,Number.MAX_VALUE);
     }
     for(const [id,s] of result.instruments) {
-      finite(s.volume,'volumen del instrumento '+id,0,4);finite(s.pan,'panorama',-1,1);finite(s.detune,'afinación',-12000,12000);
+      finite(s.volume,'volumen del instrumento '+id,0,Number.MAX_VALUE);finite(s.pan,'panorama',-1,1);finite(s.detune,'afinación',-12000,12000);
     }
     for(const m of result.markers){finite(m.time,'tiempo de automatización',0,100000);finite(m.value,'automatización',-12000,12000);}
     return result;
@@ -152,7 +152,7 @@
     const end=audible.reduce((v,n)=>Math.max(v,n.time+n.length),0);
     if(end>40000)fail('la secuencia es demasiado larga');
     const by=(setting,id)=>seq.markers.filter(m=>m.setting===setting&&(id===undefined||m.instrument===id));
-    const tempo=curve(seq.bpm,by(0),10,999),globalVolume=curve(seq.volume,by(8),0,4);
+    const tempo=curve(seq.bpm,by(0),10,999),globalVolume=curve(seq.volume,by(8),0,Number.MAX_VALUE);
     const tempoTimes=samplingTimes([tempo],end),tempoPoints=tempoTimes.map(t=>({time:t,bpm:Math.round(tempo.at(t))}));
     let duration=0;
     for(let i=0;i<tempoPoints.length;i++)duration+=((tempoPoints[i+1]?.time??end)-tempoPoints[i].time)*15/tempoPoints[i].bpm;
@@ -180,7 +180,7 @@
       if(!drum&&next===melodic.length)fail('más de 30 instrumentos melódicos independientes');
       const channel=drum?(mergeDrums?9:9+16*drums++):melodic[next++],c=channel%16,port=Math.floor(channel/16);
       const s=seq.instruments.get(id)||{volume:1,pan:0,detune:0,name:''};
-      const vol=curve(s.volume,by(1,id),0,4),pan=curve(s.pan,by(2,id),-1,1),tuning=curve(s.detune,by(11,id),-12000,12000);
+      const vol=curve(s.volume,by(1,id),0,Number.MAX_VALUE),pan=curve(s.pan,by(2,id),-1,1),tuning=curve(s.detune,by(11,id),-12000,12000);
       const peakScale=Math.max(1,globalVolume.max*vol.max),add=track();
       add(0,meta(33,[port]),0);add(0,meta(3,text(s.name||'OS instrument '+id)),0);
       let program=drum?0:(programs[base]||1)-1;
