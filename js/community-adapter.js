@@ -51,7 +51,7 @@
     async listProjects(){return clone(load().projects);}
     async deleteProject(projectId){const s=load();s.projects=s.projects.filter(x=>x.id!==projectId);save(s);}
     async publish(project,{title,description='',visibility='private',tags=[]}={}){
-      const store=load(),p=await this.saveProject(project),song={id:id(),title:(title||p.title||'Sin título').trim().slice(0,100),authorUsername:store.profile.username,authorDisplayName:store.profile.displayName,description:String(description).slice(0,1000),bpm:p.bpm,scaleName:p.scale||'Chromatic',durationSeconds:duration(p),visibility:['private','unlisted','public'].includes(visibility)?visibility:'private',tags:[...new Set(tags.map(x=>String(x).trim().toLowerCase()).filter(Boolean))].slice(0,8),plays:0,likesCount:0,remixesCount:0,createdAt:now(),project:clone(p),remixOf:p.remixOf||null};
+      const p=await this.saveProject(project),store=load(),song={id:id(),title:(title||p.title||'Sin título').trim().slice(0,100),authorUsername:store.profile.username,authorDisplayName:store.profile.displayName,description:String(description).slice(0,1000),bpm:p.bpm,scaleName:p.scale||'Chromatic',durationSeconds:duration(p),visibility:['private','unlisted','public'].includes(visibility)?visibility:'private',tags:[...new Set(tags.map(x=>String(x).trim().toLowerCase()).filter(Boolean))].slice(0,8),plays:0,likesCount:0,remixesCount:0,createdAt:now(),project:clone(p),remixOf:p.remixOf||null};
       store.songs.unshift(song);save(store);return clone(song);
     }
     async recordPlay(songId){const s=load(),song=s.songs.find(x=>x.id===songId);if(song){song.plays=(song.plays||0)+1;save(s);return song.plays;}return null;}
