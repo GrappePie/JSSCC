@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JSSCC Online Sequencer Bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lets JSSCC search the Online Sequencer catalog through your normal browser session and play results as chiptune.",
   "permissions": ["tabs"],
   "host_permissions": [

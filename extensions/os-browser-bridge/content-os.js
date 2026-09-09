@@ -33,8 +33,10 @@ function parseCard(anchor,id){
 }
 function scrape(){
   const body=clean(document.body?.innerText);
-  if(/just a moment|checking your browser|verify you are human|cloudflare/i.test(body)){
-    throw new Error('Online Sequencer mostró una verificación del navegador. Ábrelo una vez manualmente y vuelve a intentar.');
+  if(/just a moment|checking your browser|verify you are human|cloudflare|turnstile/i.test(body)){
+    const error=new Error('Online Sequencer necesita verificar este navegador. Completa la verificación en la pestaña abierta y vuelve a buscar.');
+    error.code='challenge';
+    throw error;
   }
   const byId=new Map();
   for(const a of document.querySelectorAll('a[href]')){
@@ -53,5 +55,5 @@ function scrape(){
 chrome.runtime.onMessage.addListener((message,_sender,sendResponse)=>{
   if(message?.type!=='JSSCC_OS_SCRAPE')return;
   try{sendResponse({ok:true,payload:scrape()});}
-  catch(error){sendResponse({ok:false,error:error?.message||'No se pudo leer el catálogo'});}
+  catch(error){sendResponse({ok:false,code:error?.code||'scrape_error',error:error?.message||'No se pudo leer el catálogo'});}
 });
