@@ -12,6 +12,7 @@
   const INSTALL_URL='https://github.com/GrappePie/JSSCC/tree/github-pages/extensions/os-browser-bridge';
   const originalFetch=root.fetch.bind(root);
   const pending=new Map();
+  const prefs={sort:'newest',range:'all',scope:'all'};
   let sequence=0,lastSeen=0;
 
   function id(){return 'osb-'+Date.now().toString(36)+'-'+(++sequence).toString(36)+'-'+Math.random().toString(36).slice(2,8);}
@@ -50,9 +51,9 @@
     const params={
       q:(u.searchParams.get('q')||'').slice(0,120),
       page:Math.max(1,Math.min(20,Number(u.searchParams.get('page'))||1)),
-      sort:(u.searchParams.get('sort')||'newest').slice(0,20),
-      range:(u.searchParams.get('range')||'all').slice(0,20),
-      scope:(u.searchParams.get('scope')||'all').slice(0,20)
+      sort:prefs.sort,
+      range:prefs.range,
+      scope:prefs.scope
     };
     if(params.q.length<2)return originalFetch(input,init);
     try{
@@ -67,12 +68,26 @@
     }
   };
 
+  function filterButton(label,key,value,searchInput){
+    const b=document.createElement('button');b.type='button';b.className='edition-minor';b.textContent=label;b.dataset.active=String(prefs[key]===value);
+    b.onclick=()=>{
+      prefs[key]=value;
+      b.parentElement.querySelectorAll('button').forEach(x=>x.dataset.active=String(x===b));
+      if(searchInput.value.trim().length>=2)searchInput.dispatchEvent(new Event('input',{bubbles:true}));
+    };
+    return b;
+  }
   async function enhanceUi(){
-    const dialog=document.getElementById('jsscc-sequencer-dialog'),nav=dialog?.querySelector('.edition-nav');
-    if(!dialog||!nav)return setTimeout(enhanceUi,80);
+    const dialog=document.getElementById('jsscc-sequencer-dialog'),nav=dialog?.querySelector('.edition-nav'),searchInput=document.getElementById('edition-search');
+    if(!dialog||!nav||!searchInput)return setTimeout(enhanceUi,80);
     if(document.getElementById('os-browser-bridge-status'))return;
-    const row=document.createElement('p');row.id='os-browser-bridge-status';row.className='edition-feedback';
-    row.textContent='Comprobando OS Browser Bridge…';nav.insertAdjacentElement('afterend',row);
+    const row=document.createElement('p');row.id='os-browser-bridge-status';row.className='edition-feedback';row.textContent='Comprobando OS Browser Bridge…';nav.insertAdjacentElement('afterend',row);
+    const filters=document.createElement('div');filters.className='edition-bridge-filters';filters.setAttribute('aria-label','Filtros del catálogo');
+    const sort=document.createElement('div');sort.className='edition-filter-group';sort.append(document.createTextNode('Orden: '));
+    [['Newest','newest'],['Popular','popular'],['Most Notes','notes'],['Longest','longest']].forEach(([label,value])=>sort.append(filterButton(label,'sort',value,searchInput)));
+    const range=document.createElement('div');range.className='edition-filter-group';range.append(document.createTextNode('Fecha: '));
+    [['Today','today'],['This week','week'],['This month','month'],['All time','all']].forEach(([label,value])=>range.append(filterButton(label,'range',value,searchInput)));
+    row.insertAdjacentElement('afterend',filters);filters.append(sort,range);
     const connected=await ping();
     if(connected){row.textContent='OS Browser Bridge conectado · las búsquedas usan tu sesión normal del navegador.';row.dataset.error='false';}
     else{
@@ -81,5 +96,5 @@
     }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceUi,0));else setTimeout(enhanceUi,0);
-  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,INSTALL_URL,get available(){return Date.now()-lastSeen<30000;}});
+  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,INSTALL_URL,prefs,get available(){return Date.now()-lastSeen<30000;}});
 })(window);
