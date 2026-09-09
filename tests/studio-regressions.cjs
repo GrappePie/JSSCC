@@ -2,12 +2,13 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 
+const Editing=require('../js/studio-editing.js');
 require('../js/midi-writer.js');
 const Parser=require('../js/midi-core.js');
 
 function project(){
   return {
-    version:1,id:'p1',title:'Test Song',bpm:120,bars:1,scale:'C Major',currentPattern:'A',structure:['A'],
+    version:2,id:'p1',title:'Test Song',bpm:120,bars:1,scale:'C Major',grid:16,currentPattern:'A',structure:['A'],
     tracks:[
       {id:'pulse1',name:'Pulse 1',instrument:'square',volume:85},
       {id:'triangle',name:'Triangle',instrument:'triangle',volume:80},
@@ -32,6 +33,32 @@ test('Studio MIDI tempo matches project BPM',()=>{
   const parsed=Parser.parseMidi(globalThis.JSSCCMidiWriter.build(p).buffer,'tempo.mid');
   assert.ok(parsed.tempoEvents.length>=1);
   assert.ok(Math.abs(parsed.tempoEvents[0].us-400000)<=1);
+});
+
+test('1/32 Studio notes keep fractional start and duration in MIDI',()=>{
+  const p=project();p.grid=32;p.patterns.A.notes.pulse1=[{step:.5,pitch:72,length:.5,velocity:100}];p.patterns.A.notes.triangle=[];p.patterns.A.notes.noise=[];
+  const parsed=Parser.parseMidi(globalThis.JSSCCMidiWriter.build(p).buffer,'thirty-second.mid');
+  const on=parsed.events.find(e=>e.type==='on'&&e.note===72),off=parsed.events.find(e=>e.type==='off'&&e.note===72);
+  assert.ok(on);assert.ok(off);
+  assert.ok(Math.abs(on.time-.0625)<.002,`unexpected note-on ${on.time}`);
+  assert.ok(Math.abs((off.time-on.time)-.0625)<.002,`unexpected note length ${off.time-on.time}`);
+});
+
+test('editing snap is real from quarter notes through 1/32',()=>{
+  assert.equal(Editing.snapSize(4),4);assert.equal(Editing.snapSize(8),2);assert.equal(Editing.snapSize(16),1);assert.equal(Editing.snapSize(32),.5);
+  assert.equal(Editing.quantize(.74,32),.5);assert.equal(Editing.quantize(.76,32),1);assert.equal(Editing.quantize(3.2,8),4);
+});
+
+test('group move clamps all selected notes as one unit',()=>{
+  const notes=[{step:1,pitch:60,length:2},{step:12,pitch:72,length:3}];
+  assert.deepEqual(Editing.clampMove(notes,-5,3,16,16),{step:-1,pitch:3});
+  assert.deepEqual(Editing.clampMove(notes,10,-100,16,16),{step:1,pitch:-60});
+});
+
+test('resize and quantize respect active snap and pattern boundary',()=>{
+  assert.equal(Editing.resizedLength({step:15.5,length:.5},8,32,16),.5);
+  const n=Editing.quantizeNote({step:3.7,pitch:60,length:2.4},8,16);
+  assert.equal(n.step,4);assert.equal(n.length,2);
 });
 
 test('Local community publish preserves editable project and supports remix/favorite',async()=>{
