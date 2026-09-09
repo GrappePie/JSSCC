@@ -2,7 +2,7 @@ name: Audio regression checks
 on:
   push:
     branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908, fix/live-ui-20260908, feat/pcm-edition-sequencer-20260908, fix/panel-startup-20260908, feat/direct-sequence-play-20260908]
-    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'tests/sequence*', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
+    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/os-midi-export-compat.cjs', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'tests/sequence*', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
   pull_request:
     branches: [github-pages]
   workflow_dispatch:
@@ -31,7 +31,7 @@ jobs:
           git rev-parse HEAD > test-results/commit.txt
           git archive --format=zip HEAD js assets css index.html credits.html README.md src tests tools docs .github/workflows/audio-regression.yml > test-results/tested-source.zip
       - name: Run required Node regression suite
-        run: node --test tests/regressions.cjs tests/large-midi-overflow-regression.cjs | tee test-results/node-tests.txt
+        run: node --test tests/regressions.cjs tests/large-midi-overflow-regression.cjs tests/os-midi-export-compat.cjs | tee test-results/node-tests.txt
       - name: Test integer PCM kernel, 992 native prefixes and state-conditioned chords
         run: node --test tests/pcm-regressions.cjs tests/pcm-polyphony.cjs | tee test-results/pcm-node-tests.txt
       - name: Test read-only UI meters and unchanged PCM
