@@ -2,7 +2,7 @@ name: Audio regression checks
 on:
   push:
     branches: [github-pages, fix/audit-20260908, fix/reference-envelope-psg-20260908, fix/pcm-matrix-20260908, fix/live-ui-20260908, feat/pcm-edition-sequencer-20260908, fix/panel-startup-20260908, feat/direct-sequence-play-20260908]
-    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'tests/sequence*', 'tools/**', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
+    paths: ['js/**', 'index.html', 'tests/*regressions*', 'tests/pcm_browser.py', 'tests/pcm-polyphony*', 'tests/pcm-reference-fixtures.json', 'tests/run_silent_audio_ci.py', 'tests/ui*', 'tests/edition*', 'tests/startup*', 'tests/sequence*', 'src/**', 'credits.html', 'assets/**', 'css/**', '.github/workflows/audio-regression.yml']
   pull_request:
     branches: [github-pages]
   workflow_dispatch:
@@ -41,10 +41,7 @@ jobs:
       - name: Test renderer bootstrap ordering
         run: node --test tests/startup-regressions.cjs | tee test-results/startup-node-tests.txt
       - name: Test bounded automatic sequence import
-        run: node --test tests/sequence-regressions.cjs | tee test-results/sequence-node-tests.txt
-      - name: Probe reported Online Sequencer sequence 2261878
-        if: ${{ !cancelled() }}
-        run: node tools/probe_sequence_2261878.cjs | tee test-results/sequence-2261878-probe.log
+        run: node --test tests/sequence-regressions.cjs tests/sequence-volume-regression.cjs | tee test-results/sequence-node-tests.txt
       - name: Install pinned browser test dependencies
         # Playwright 1.55 stalls AudioWorklet targets (microsoft/playwright#37592).
         run: python -m pip install playwright==1.56.0 numpy==2.2.6
