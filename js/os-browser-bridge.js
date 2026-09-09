@@ -5,7 +5,7 @@
  */
 (function(root){
   'use strict';
-  const VERSION='0.1.1';
+  const VERSION='0.1.2';
   const PAGE_SOURCE='JSSCC_PAGE';
   const EXT_SOURCE='JSSCC_OS_BRIDGE';
   const SEARCH_ENDPOINT='https://jsscc-sequence-bridge.lovable.app/api/public/sequence-search';
@@ -13,7 +13,7 @@
   const originalFetch=root.fetch.bind(root);
   const pending=new Map();
   const prefs={sort:'newest',range:'all',scope:'all'};
-  let sequence=0,lastSeen=0;
+  let sequence=0,lastSeen=0,lastVersion=null;
 
   function id(){return 'osb-'+Date.now().toString(36)+'-'+(++sequence).toString(36)+'-'+Math.random().toString(36).slice(2,8);}
   function send(type,payload={},timeout=1200){
@@ -35,7 +35,7 @@
   });
 
   async function ping(){
-    try{const out=await send('PING',{},500);return !!out.version;}catch(_){return false;}
+    try{const out=await send('PING',{},500);lastVersion=out.version||null;return lastVersion||false;}catch(_){return false;}
   }
   async function search(params){
     const out=await send('SEARCH',params,20000);
@@ -56,13 +56,13 @@
       scope:prefs.scope
     };
     if(params.q.length<2)return originalFetch(input,init);
-    const connected=(Date.now()-lastSeen<30000)||await ping();
+    const connected=(Date.now()-lastSeen<30000)||(await ping());
     if(!connected)return originalFetch(input,init);
     try{
       const payload=await search(params);
       payload.source='browser-extension';
       payload.count=Number.isFinite(payload.count)?payload.count:payload.results.length;
-      return new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension'}});
+      return new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension','x-jsscc-bridge-version':lastVersion||''}});
     }catch(error){
       console.info('[JSSCC] OS Browser Bridge search failed:',error.message);
       const challenge=error.code==='challenge';
@@ -72,7 +72,7 @@
           ?'Online Sequencer necesita verificar tu navegador. Completa la verificación en la pestaña que se abrió y después vuelve a buscar.'
           :(error.message||'El OS Browser Bridge no pudo completar la búsqueda.')
       };
-      return new Response(JSON.stringify(body),{status:challenge?428:502,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension'}});
+      return new Response(JSON.stringify(body),{status:challenge?428:502,headers:{'content-type':'application/json','x-jsscc-search-source':'browser-extension','x-jsscc-bridge-version':lastVersion||''}});
     }
   };
 
@@ -97,12 +97,12 @@
     [['Today','today'],['This week','week'],['This month','month'],['All time','all']].forEach(([label,value])=>range.append(filterButton(label,'range',value,searchInput)));
     row.insertAdjacentElement('afterend',filters);filters.append(sort,range);
     const connected=await ping();
-    if(connected){row.textContent='OS Browser Bridge conectado · las búsquedas usan tu sesión normal del navegador.';row.dataset.error='false';}
+    if(connected){row.textContent='OS Browser Bridge v'+connected+' conectado · las búsquedas usan tu sesión normal del navegador.';row.dataset.error='false';}
     else{
       row.textContent='OS Browser Bridge no instalado · se usará el buscador auxiliar/fallback. ';
       const a=document.createElement('a');a.className='edition-link';a.textContent='Instalar integración ↗';a.href=INSTALL_URL;a.target='_blank';a.rel='noopener noreferrer';row.append(a);row.dataset.error='false';
     }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceUi,0));else setTimeout(enhanceUi,0);
-  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,INSTALL_URL,prefs,get available(){return Date.now()-lastSeen<30000;}});
+  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,INSTALL_URL,prefs,get detectedVersion(){return lastVersion;},get available(){return Date.now()-lastSeen<30000;}});
 })(window);
