@@ -17,7 +17,7 @@ test('extension prefers sequence page metadata over generic Online Sequencer hea
   const sequence=fs.readFileSync(path.join(root,'extensions/os-browser-bridge/content-sequence.js'),'utf8');
   assert.match(sequence,/meta\[property="og:title"\]/);
   assert.match(sequence,/document\.title/);
-  assert.match(sequence,/^Online Sequencer\\s\*\[-\|:\]/m);
+  assert.match(sequence,/replace\(\/\^Online Sequencer\\s\*\[-\|:\]/);
   assert.match(sequence,/for\(const node of document\.querySelectorAll\('\.sequence-title,\.title,h1,h2,h3'\)\)/);
 });
 
