@@ -9,6 +9,7 @@
   const PAGE_SOURCE='JSSCC_PAGE';
   const EXT_SOURCE='JSSCC_OS_BRIDGE';
   const SEARCH_ENDPOINT='https://jsscc-sequence-bridge.lovable.app/api/public/sequence-search';
+  const INSTALL_URL='https://github.com/GrappePie/JSSCC/tree/github-pages/extensions/os-browser-bridge';
   const originalFetch=root.fetch.bind(root);
   const pending=new Map();
   let sequence=0,lastSeen=0;
@@ -65,5 +66,20 @@
       return originalFetch(input,init);
     }
   };
-  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,get available(){return Date.now()-lastSeen<30000;}});
+
+  async function enhanceUi(){
+    const dialog=document.getElementById('jsscc-sequencer-dialog'),nav=dialog?.querySelector('.edition-nav');
+    if(!dialog||!nav)return setTimeout(enhanceUi,80);
+    if(document.getElementById('os-browser-bridge-status'))return;
+    const row=document.createElement('p');row.id='os-browser-bridge-status';row.className='edition-feedback';
+    row.textContent='Comprobando OS Browser Bridge…';nav.insertAdjacentElement('afterend',row);
+    const connected=await ping();
+    if(connected){row.textContent='OS Browser Bridge conectado · las búsquedas usan tu sesión normal del navegador.';row.dataset.error='false';}
+    else{
+      row.textContent='OS Browser Bridge no instalado · se usará el buscador auxiliar/fallback. ';
+      const a=document.createElement('a');a.className='edition-link';a.textContent='Instalar integración ↗';a.href=INSTALL_URL;a.target='_blank';a.rel='noopener noreferrer';row.append(a);row.dataset.error='false';
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceUi,0));else setTimeout(enhanceUi,0);
+  root.JSSCCOSBrowserBridge=Object.freeze({VERSION,ping,search,INSTALL_URL,get available(){return Date.now()-lastSeen<30000;}});
 })(window);
