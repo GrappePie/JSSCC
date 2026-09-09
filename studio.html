@@ -66,6 +66,11 @@
             <button class="tool" data-tool="erase" title="Borrar notas (E)" aria-label="Borrar notas"><span>⌫</span><em>Borrar</em><kbd>E</kbd></button>
           </div>
           <span class="toolbar-separator"></span>
+          <div class="selection-actions history-actions" aria-label="Historial">
+            <button id="undoBtn" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+            <button id="redoBtn" title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
+          </div>
+          <span class="toolbar-separator"></span>
           <label class="compact-control">Duración
             <select id="noteLengthSelect">
               <option value="0.5">1/32</option><option value="1" selected>1/16</option><option value="2">1/8</option><option value="4">1/4</option><option value="8">1/2</option><option value="16">1 compás</option>
@@ -190,5 +195,20 @@
   <script src="./js/studio-editing.js?v=studio-2"></script>
   <script src="./js/community-adapter.js?v=studio-1"></script>
   <script src="./js/studio.js?v=studio-2"></script>
+  <script>
+  (()=>{
+    const editable=target=>target instanceof HTMLElement&&(target.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
+    window.addEventListener('keydown',event=>{
+      if(!editable(event.target)||!(event.ctrlKey||event.metaKey))return;
+      if(['c','v','z','y','d'].includes(event.key.toLowerCase()))event.stopImmediatePropagation();
+    },true);
+    const dispatch=(key,shiftKey=false)=>{
+      document.querySelector('#pianoRoll')?.focus();
+      window.dispatchEvent(new KeyboardEvent('keydown',{key,ctrlKey:true,shiftKey,bubbles:true,cancelable:true}));
+    };
+    document.querySelector('#undoBtn').addEventListener('click',()=>dispatch('z'));
+    document.querySelector('#redoBtn').addEventListener('click',()=>dispatch('y'));
+  })();
+  </script>
 </body>
 </html>
