@@ -1,0 +1,35 @@
+name: Studio regressions
+
+on:
+  push:
+    branches: [github-pages]
+    paths:
+      - 'studio.html'
+      - 'css/studio.css'
+      - 'js/studio.js'
+      - 'js/midi-writer.js'
+      - 'js/community-adapter.js'
+      - 'tests/studio-regressions.cjs'
+      - '.github/workflows/studio-regression.yml'
+  pull_request:
+    paths:
+      - 'studio.html'
+      - 'css/studio.css'
+      - 'js/studio.js'
+      - 'js/midi-writer.js'
+      - 'js/community-adapter.js'
+      - 'tests/studio-regressions.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/studio-regressions.cjs
