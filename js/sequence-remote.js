@@ -12,7 +12,7 @@
   function workerConvert(bytes,metadata,signal){
     assertActive(signal);
     return new Promise((resolve,reject)=>{
-      const worker=new Worker(new URL('./sequence-import-worker.js?v=os-midi-2',base || document.baseURI));
+      const worker=new Worker(new URL('./sequence-import-worker.js?v=os-midi-3',base || document.baseURI));
       const finish=(error,result)=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);worker.terminate();error?reject(error):resolve(result);};
       const abort=()=>finish(abortError());
       const timer=setTimeout(()=>finish(Error('La conversión excedió 15 segundos')),15000);
