@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JSSCC Studio — Composer & Community</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="stylesheet" href="./css/studio.css?v=studio-1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./index.html"><strong>JSSCC</strong><span>MIDI TO 8-BIT</span></a>
+    <nav class="tabs" aria-label="Principal">
+      <a href="./index.html">REPRODUCTOR</a>
+      <button class="tab active" data-view="compose">COMPOSE</button>
+      <button class="tab" data-view="explore">EXPLORAR</button>
+      <button class="tab" data-view="library">MI BIBLIOTECA</button>
+    </nav>
+    <div class="session"><span id="sessionLabel">Modo local</span><button id="authBtn" class="ghost">CUENTA</button></div>
+  </header>
+
+  <main>
+    <section id="composeView" class="view active">
+      <aside class="left-panel panel">
+        <h2>PROYECTO</h2>
+        <button id="newProjectBtn">＋ Nuevo</button>
+        <button id="saveProjectBtn">▣ Guardar</button>
+        <button id="duplicateProjectBtn">⧉ Duplicar</button>
+        <button id="exportMidiBtn">⇩ Exportar MIDI</button>
+        <button id="publishBtn" class="accent">⌁ Publicar</button>
+        <hr>
+        <h2>HERRAMIENTAS</h2>
+        <button class="tool active" data-tool="paint">✎ Pintar notas</button>
+        <button class="tool" data-tool="erase">⌫ Borrar</button>
+        <button class="tool" data-tool="select">⌗ Seleccionar</button>
+        <button id="undoBtn">↶ Deshacer</button>
+        <button id="redoBtn">↷ Rehacer</button>
+        <hr>
+        <label>Escala<select id="scaleSelect"><option>Chromatic</option><option>C Major</option><option>C Minor</option><option>D Minor</option><option>E Minor</option><option>F Major</option><option>G Major</option><option>A Minor</option></select></label>
+        <label class="check"><input id="lockScale" type="checkbox"> Bloquear a escala</label>
+        <label>Cuadrícula<select id="gridSelect"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></label>
+      </aside>
+
+      <section class="workspace panel">
+        <div class="transport">
+          <button id="playBtn" class="play">▶</button>
+          <button id="stopBtn">■</button>
+          <button id="loopBtn" class="toggle active">↻ LOOP</button>
+          <label>BPM <input id="bpmInput" type="number" min="20" max="400" value="120"></label>
+          <label>Compases <input id="barsInput" type="number" min="1" max="32" value="4"></label>
+          <span id="timeLabel">00:00 / 00:08</span>
+        </div>
+        <div class="project-title-row">
+          <input id="titleInput" value="Nueva canción" maxlength="100" aria-label="Título">
+          <span id="saveState">sin guardar</span>
+        </div>
+        <div class="pattern-tabs" id="patternTabs"></div>
+        <div class="roll-wrap">
+          <div class="track-heads" id="trackHeads"></div>
+          <div class="piano-roll" id="pianoRoll" aria-label="Piano roll"></div>
+        </div>
+        <div class="keyboard" id="keyboard"></div>
+      </section>
+
+      <aside class="right-panel panel">
+        <h2>INSTRUMENTO</h2>
+        <select id="instrumentSelect"><option value="square">Pulse / Square</option><option value="triangle">Triangle</option><option value="saw">Saw</option><option value="noise">Noise</option></select>
+        <label>Volumen <input id="trackVolume" type="range" min="0" max="100" value="85"></label>
+        <label>Octava <input id="octaveInput" type="number" min="1" max="7" value="4"></label>
+        <hr>
+        <h2>PATRONES</h2>
+        <div id="patternList"></div>
+        <button id="addPatternBtn">＋ Añadir patrón</button>
+        <hr>
+        <h2>ESTRUCTURA</h2>
+        <div id="songStructure" class="structure"></div>
+        <button id="appendPatternBtn">＋ Añadir al final</button>
+        <hr>
+        <h2>UTILIDADES</h2>
+        <button id="generateBassBtn">♫ Generar bajo</button>
+        <button id="generateDrumsBtn">♩ Generar batería</button>
+        <button id="arpeggiateBtn">⌁ Arpegiar</button>
+        <button id="humanizeBtn">✦ Humanizar</button>
+      </aside>
+    </section>
+
+    <section id="exploreView" class="view community-view">
+      <div class="community-hero">
+        <div><h1>EXPLORAR</h1><p>Escucha, guarda y remezcla canciones creadas por la comunidad.</p></div>
+        <div class="search-row"><input id="songSearch" placeholder="Buscar canciones, autores o tags…"><select id="sortSelect"><option value="trending">Tendencias</option><option value="new">Más nuevas</option></select></div>
+      </div>
+      <div id="communityNotice" class="notice">El backend público todavía no está enlazado al cliente. Mientras tanto, esta vista usa tu biblioteca local y canciones demo.</div>
+      <div id="songGrid" class="song-grid"></div>
+    </section>
+
+    <section id="libraryView" class="view community-view">
+      <div class="community-hero"><div><h1>MI BIBLIOTECA</h1><p>Proyectos, favoritos y remixes guardados en este navegador.</p></div></div>
+      <div class="library-tabs"><button class="lib-tab active" data-library="projects">Proyectos</button><button class="lib-tab" data-library="favorites">Favoritos</button></div>
+      <div id="libraryGrid" class="song-grid"></div>
+    </section>
+  </main>
+
+  <dialog id="publishDialog">
+    <form method="dialog" class="dialog-card">
+      <h2>PUBLICAR CANCIÓN</h2>
+      <label>Título<input id="publishTitle" maxlength="100"></label>
+      <label>Descripción<textarea id="publishDescription" maxlength="1000"></textarea></label>
+      <label>Visibilidad<select id="publishVisibility"><option value="private">Privada</option><option value="unlisted">No listada</option><option value="public">Pública</option></select></label>
+      <label>Tags<input id="publishTags" placeholder="boss, retro, chill"></label>
+      <div class="dialog-actions"><button value="cancel">Cancelar</button><button type="button" id="confirmPublishBtn" class="accent">Publicar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="songDialog">
+    <article class="dialog-card song-detail">
+      <button id="closeSongDialog" class="dialog-close">×</button>
+      <h2 id="detailTitle"></h2><p id="detailAuthor"></p>
+      <div id="detailMeta" class="detail-meta"></div>
+      <p id="detailDescription"></p>
+      <div class="dialog-actions"><button id="detailPlayBtn">▶ Escuchar</button><button id="detailLikeBtn">♡ Like</button><button id="detailFavoriteBtn">☆ Guardar</button><button id="detailRemixBtn" class="accent">⧉ Remix</button></div>
+    </article>
+  </dialog>
+
+  <script src="./js/midi-writer.js?v=studio-1"></script>
+  <script src="./js/community-adapter.js?v=studio-1"></script>
+  <script src="./js/studio.js?v=studio-1"></script>
+</body>
+</html>
