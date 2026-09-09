@@ -67,6 +67,17 @@
         el('p','', 'Cuando abras una canción allí, puedes pegar su URL o ID abajo y JSSCC la reproducirá directamente como chiptune.'));
       rail.append(box);
     }
+    function renderBrowserChallenge(q,message){
+      rail.dataset.liveSearch='true';rail.replaceChildren();
+      const box=el('div','edition-empty');
+      box.append(
+        el('p','',message||'Online Sequencer necesita verificar tu navegador.'),
+        el('p','', 'La extensión dejó abierta la pestaña de Online Sequencer para que completes esa verificación manualmente.'),
+        el('p','', 'Después vuelve a JSSCC y busca de nuevo “'+q+'”.'),
+        link('Abrir la búsqueda oficial ↗',officialSearchUrl(q))
+      );
+      rail.append(box);
+    }
     async function run(){
       const q=search.value.trim();query=q;
       if(q.length<2){clearRemote();return;}
@@ -79,9 +90,17 @@
         const body=await res.json().catch(()=>({}));
         if(mine!==serial||q!==query)return;
         if(!res.ok){
-          if(body.error==='upstream_challenge'||body.error==='upstream_login')renderBlocked(q,'Online Sequencer activó su protección anti-bot para esta consulta automática.');
-          else renderBlocked(q,body.message||'No fue posible consultar el catálogo ahora mismo.');
-          tell(body.message||'La búsqueda automática no está disponible; abre la búsqueda oficial.',true);return;
+          if(body.error==='browser_challenge'){
+            renderBrowserChallenge(q,body.message);
+            tell(body.message||'Completa la verificación en la pestaña de Online Sequencer y vuelve a buscar.',true);
+          }else if(body.error==='upstream_challenge'||body.error==='upstream_login'){
+            renderBlocked(q,'Online Sequencer activó su protección anti-bot para esta consulta automática.');
+            tell(body.message||'La búsqueda automática no está disponible; abre la búsqueda oficial.',true);
+          }else{
+            renderBlocked(q,body.message||'No fue posible consultar el catálogo ahora mismo.');
+            tell(body.message||'No fue posible consultar el catálogo ahora mismo.',true);
+          }
+          return;
         }
         renderResults(body,q);
       }catch(e){
