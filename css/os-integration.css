@@ -1,0 +1,10 @@
+/* Pixel-art Online Sequencer-inspired mark for the independent JSSCC integration. */
+.edition-os-badge,.edition-art-os{font-size:0!important;letter-spacing:0!important;position:relative;overflow:visible}
+.edition-os-badge{width:28px!important;height:22px!important;padding:0!important;border:1px solid currentColor!important}
+.edition-os-badge::before,.edition-art-os::before,#edition-gallery-title::before{content:"";display:inline-block;width:4px;height:4px;background:#2d82dc;box-shadow:5px 0 #2d82dc,10px 0 #34383f,15px 0 #34383f,0 5px #34383f,5px 5px #34383f,10px 5px #2d82dc,15px 5px #2d82dc,0 10px #34383f,5px 10px #34383f,10px 10px #34383f,15px 10px #34383f;outline:1px solid #17191d;image-rendering:pixelated}
+.edition-os-badge::before{transform:translate(-2px,-1px)}
+.edition-art-os{display:grid;place-items:center;width:42px;height:34px;border:2px solid currentColor!important;padding:0!important}
+.edition-art-os::before{transform:scale(1.45);transform-origin:center}
+#edition-gallery-title{display:flex;align-items:center;gap:12px}
+#edition-gallery-title::before{flex:0 0 auto;transform:scale(1.2);transform-origin:left center;margin-right:8px}
+.edition-deeplink-play{font:700 11px/1.4 ui-monospace,Consolas,monospace;color:var(--edition-foreground);background:var(--edition-light);border:1px solid var(--edition-foreground);padding:3px 7px;cursor:pointer}
