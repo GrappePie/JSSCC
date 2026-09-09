@@ -49,6 +49,14 @@ test('editing snap is real from quarter notes through 1/32',()=>{
   assert.equal(Editing.quantize(.74,32),.5);assert.equal(Editing.quantize(.76,32),1);assert.equal(Editing.quantize(3.2,8),4);
 });
 
+test('default paint duration follows grid changes without overriding intentional longer notes',()=>{
+  assert.equal(Editing.syncedNoteLength(1,16,32),.5);
+  assert.equal(Editing.syncedNoteLength(.5,32,16),1);
+  assert.equal(Editing.syncedNoteLength(1,16,8),2);
+  assert.equal(Editing.syncedNoteLength(4,16,32),4);
+  assert.equal(Editing.syncedNoteLength(2,8,32),.5);
+});
+
 test('group move clamps all selected notes as one unit',()=>{
   const notes=[{step:1,pitch:60,length:2},{step:12,pitch:72,length:3}];
   assert.deepEqual(Editing.clampMove(notes,-5,3,16,16),{step:-1,pitch:3});
