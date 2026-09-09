@@ -2,19 +2,21 @@
 
 function clean(text){return String(text||'').replace(/\s+/g,' ').trim();}
 function candidateContainer(anchor){
-  let node=anchor;
-  for(let i=0;i<6&&node;i++,node=node.parentElement){
+  let node=anchor.parentElement,best=node||anchor;
+  for(let i=0;i<7&&node;i++,node=node.parentElement){
     const text=clean(node.innerText);
-    if(text.length>=clean(anchor.textContent).length&&text.length<700)return node;
+    if(text.length<20||text.length>700)continue;
+    best=node;
+    if(/\bby\b/i.test(text)&&/\b\d{1,2}:\d{2}\b/.test(text))return node;
   }
-  return anchor.parentElement||anchor;
+  return best;
 }
 function parseCard(anchor,id){
   const box=candidateContainer(anchor);
   const text=clean(box.innerText);
   const rawTitle=clean(anchor.textContent);
   const title=rawTitle&&rawTitle!==id?rawTitle:('Sequence '+id);
-  const authorMatch=text.match(/\bby\s+([^|·•]{1,80}?)(?=\s+\d{4}-\d{2}-\d{2}|\s+\d{1,2}:\d{2}|$)/i);
+  const authorMatch=text.match(/\bby\s+(.{1,80}?)(?=\s+\d{4}-\d{2}-\d{2}|\s+\d{1,2}:\d{2}|$)/i);
   const durationMatch=text.match(/(?:^|\s)(\d{1,2}:\d{2})(?:\s|$)/);
   const img=box.querySelector('img');
   let thumbnail='';
@@ -40,7 +42,8 @@ function scrape(){
     if(u.hostname!=='onlinesequencer.net')continue;
     const match=u.pathname.match(/^\/(\d{1,9})\/?$/);if(!match)continue;
     const id=match[1],card=parseCard(a,id),old=byId.get(id);
-    if(!old||card.title.length>old.title.length)byId.set(id,card);
+    const score=x=>(/^Sequence \d+$/.test(x.title)?0:1000)+x.title.length+(x.author?200:0)+(x.duration?100:0)+(x.thumbnail?50:0);
+    if(!old||score(card)>score(old))byId.set(id,card);
   }
   const results=[...byId.values()].filter(x=>x.title&&!/^Sequence \d+$/.test(x.title)).slice(0,60);
   if(!results.length)throw new Error('No se pudieron leer resultados del catálogo cargado.');
