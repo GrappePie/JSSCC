@@ -37,12 +37,23 @@ with sync_playwright() as pw:
   check('Paint creates a note',page.locator('.note-block').count()==1)
   check('Onboarding hint hides after first note',page.locator('#rollHint.hidden').count()==1)
 
+  # Visible history buttons must work, not only keyboard shortcuts.
+  page.click('#undoBtn');page.wait_for_timeout(100)
+  check('Visible Undo removes the painted note',page.locator('.note-block').count()==0)
+  page.click('#redoBtn');page.wait_for_timeout(100)
+  check('Visible Redo restores the note',page.locator('.note-block').count()==1)
+
   # Selection should be a real mode and clicking a note selects it.
   page.keyboard.press('v')
   check('V shortcut activates Select',page.locator('.tool[data-tool="select"].active').count()==1)
   note=page.locator('.note-block').first;note.click();page.wait_for_timeout(80)
   check('Selected note has visible selected state',page.locator('.note-block.selected').count()==1)
   check('Selection inspector appears',page.locator('#selectionInspector:not([hidden])').count()==1)
+
+  # Text editing shortcuts must not accidentally undo notes in the composer.
+  page.click('#titleInput');page.keyboard.type(' X');page.keyboard.press('Control+z');page.wait_for_timeout(100)
+  check('Ctrl+Z inside title input does not undo composer notes',page.locator('.note-block').count()==1)
+  page.locator('#pianoRoll').focus()
 
   # Duplicate and delete operate on the selection.
   page.keyboard.press('Control+d');page.wait_for_timeout(100)
