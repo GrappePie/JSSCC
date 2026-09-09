@@ -41,7 +41,7 @@ jobs:
       - name: Test renderer bootstrap ordering
         run: node --test tests/startup-regressions.cjs | tee test-results/startup-node-tests.txt
       - name: Test bounded automatic sequence import
-        run: node --test tests/sequence-regressions.cjs | tee test-results/sequence-node-tests.txt
+        run: node --test tests/sequence-regressions.cjs tests/sequence-volume-regression.cjs | tee test-results/sequence-node-tests.txt
       - name: Install pinned browser test dependencies
         # Playwright 1.55 stalls AudioWorklet targets (microsoft/playwright#37592).
         run: python -m pip install playwright==1.56.0 numpy==2.2.6
